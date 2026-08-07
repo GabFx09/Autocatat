@@ -189,7 +189,6 @@ function saveConfig_(configs) {
 
 var TIMEZONE = 'Asia/Jakarta';
 var WARNA_MASUK = '#00FF00';
-var WARNA_KELUAR = '#FF9900';
 
 /** Ambil angka murni dari string nominal, mis. "Rp1.234.000" -> 1234000. */
 function ambilAngka_(rp) {
@@ -246,6 +245,13 @@ function logTransaction_(body) {
       return jsonResponse_(result);
     }
 
+    var jenis = String(body.type || '').toLowerCase();
+    if (jenis !== 'masuk') {
+      result.status = 'ignored';
+      result.message = 'Bukan notifikasi uang masuk, diabaikan';
+      return jsonResponse_(result);
+    }
+
     var spreadsheetId = props.getProperty('SPREADSHEET_ID_' + category);
     var sheetName = props.getProperty('SHEET_NAME_' + category) || categoryDef.label;
 
@@ -271,26 +277,18 @@ function logTransaction_(body) {
     var targetRow = lastRowInColumnA_(sheet) + 1;
     var namaRekBank = parseKeterangan_(body.text);
     var nominal = ambilAngka_(body.amount);
-    var jenis = String(body.type || '').toLowerCase();
 
     // Kolom B (OP Proses), D (Jam Kasih), dan E (User ID) sengaja tidak
     // ditulis -- semuanya dikosongkan untuk transaksi otomatis, Jam Kasih
     // baru terisi manual lewat onEdit begitu User ID diisi orang.
     sheet.getRange(targetRow, 1).setValue(Utilities.formatDate(waktuNotifikasi, TIMEZONE, 'dd/MM/yyyy'));
     sheet.getRange(targetRow, 6).setValue(namaRekBank);
-
-    if (jenis === 'keluar') {
-      sheet.getRange(targetRow, 9).setValue(nominal);
-      sheet.getRange(targetRow, 6).setBackground(WARNA_KELUAR);
-      sheet.getRange(targetRow, 9).setBackground(WARNA_KELUAR);
-    } else {
-      sheet.getRange(targetRow, 7).setValue(nominal);
-      sheet.getRange(targetRow, 6, 1, 2).setBackground(WARNA_MASUK);
-      // Nama Rek Bank & Credit sudah terisi -> Jam Catat otomatis terisi juga,
-      // sama seperti aturan onEdit -- ditulis langsung di sini karena onEdit
-      // tidak terpicu untuk penulisan otomatis dari script.
-      sheet.getRange(targetRow, 3).setValue(Utilities.formatDate(now, TIMEZONE, 'HH:mm:ss'));
-    }
+    sheet.getRange(targetRow, 7).setValue(nominal);
+    sheet.getRange(targetRow, 6, 1, 2).setBackground(WARNA_MASUK);
+    // Nama Rek Bank & Credit sudah terisi -> Jam Catat otomatis terisi juga,
+    // sama seperti aturan onEdit -- ditulis langsung di sini karena onEdit
+    // tidak terpicu untuk penulisan otomatis dari script.
+    sheet.getRange(targetRow, 3).setValue(Utilities.formatDate(now, TIMEZONE, 'HH:mm:ss'));
 
     result.status = 'ok';
     result.message = 'Tercatat ke ' + categoryDef.label;

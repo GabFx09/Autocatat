@@ -32,6 +32,7 @@ class NotificationLoggerService : NotificationListenerService() {
 
         val parsed = TransactionParser.parse("$title $text")
 
+        if (parsed.type != "Masuk") return // hanya uang masuk yang dicatat, selain itu diabaikan
         if (!Config.WEB_APP_URL.startsWith("https://")) return // belum di-build dengan URL yang valid
 
         val inputData = Data.Builder()
