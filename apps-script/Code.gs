@@ -273,11 +273,10 @@ function logTransaction_(body) {
     var nominal = ambilAngka_(body.amount);
     var jenis = String(body.type || '').toLowerCase();
 
-    // Kolom D (Jam Kasih) dan E (User ID) sengaja tidak ditulis -- User ID
-    // dikosongkan untuk transaksi otomatis, Jam Kasih baru terisi manual
-    // lewat onEdit begitu User ID diisi orang.
+    // Kolom B (OP Proses), D (Jam Kasih), dan E (User ID) sengaja tidak
+    // ditulis -- semuanya dikosongkan untuk transaksi otomatis, Jam Kasih
+    // baru terisi manual lewat onEdit begitu User ID diisi orang.
     sheet.getRange(targetRow, 1).setValue(Utilities.formatDate(waktuNotifikasi, TIMEZONE, 'dd/MM/yyyy'));
-    sheet.getRange(targetRow, 2).setValue(categoryDef.key);
     sheet.getRange(targetRow, 6).setValue(namaRekBank);
 
     if (jenis === 'keluar') {
@@ -445,6 +444,9 @@ function jsonResponse_(obj) {
  *   otomatis diisi jam sekarang.
  * - Kalau E (User ID) sudah terisi -> D (Jam Kasih) otomatis diisi jam
  *   sekarang. Kalau E belum terisi, D TIDAK diisi otomatis.
+ * - C dan D hanya diisi SEKALI -- kalau sudah ada isinya (baik dari sini
+ *   maupun dari doPost notifikasi otomatis), tidak akan ditimpa lagi oleh
+ *   edit berikutnya di baris yang sama.
  */
 function onEdit(e) {
   var sheet = e.range.getSheet();
@@ -453,17 +455,19 @@ function onEdit(e) {
   var row = e.range.getRow();
   if (row === 1) return;
 
-  var rowValues = sheet.getRange(row, 5, 1, 3).getValues()[0];
-  var userId = rowValues[0];
-  var namaRekBank = rowValues[1];
-  var credit = rowValues[2];
+  var rowValues = sheet.getRange(row, 3, 1, 5).getValues()[0];
+  var jamCatat = rowValues[0];
+  var jamKasih = rowValues[1];
+  var userId = rowValues[2];
+  var namaRekBank = rowValues[3];
+  var credit = rowValues[4];
   var waktu = Utilities.formatDate(new Date(), TIMEZONE, 'HH:mm:ss');
 
-  if (namaRekBank && credit) {
+  if (namaRekBank && credit && !jamCatat) {
     sheet.getRange(row, 3).setValue(waktu);
   }
 
-  if (userId) {
+  if (userId && !jamKasih) {
     sheet.getRange(row, 4).setValue(waktu);
   }
 }
