@@ -136,9 +136,21 @@ tidak install app-nya.)
 
 Setelah itu, setiap kali ada notifikasi masuk dari salah satu dari 8 aplikasi
 yang kamu aktifkan, NotifLogger otomatis mengirimkannya ke Spreadsheet &
-Sheet yang sudah dipilih untuk bank/e-wallet itu — baris baru berisi waktu,
-nama aplikasi, judul & isi notifikasi, nominal (jika terdeteksi), dan jenis
-transaksi (Masuk/Keluar, best-effort dari kata kunci).
+Sheet yang sudah dipilih untuk bank/e-wallet itu. Kolom yang ditulis:
+
+| Kolom | Isi |
+|---|---|
+| A | Tanggal |
+| B | Kode (BCA/BRI/MANDIRI/BNI/DANA/OVO/LINKAJA/GOPAY) |
+| C | Waktu notifikasi diterima HP |
+| D | Waktu diproses server |
+| E | Judul notifikasi |
+| F | Isi notifikasi |
+| G | Nominal (angka murni, tanpa "Rp"/titik) |
+
+Baris otomatis diberi warna latar pada kolom E:G — **hijau** kalau jenis
+transaksinya "Masuk", **oranye** kalau "Keluar" (dideteksi best-effort dari
+kata kunci di isi notifikasi).
 
 ## Catatan keamanan & keterbatasan
 

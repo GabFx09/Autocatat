@@ -136,6 +136,15 @@ function saveConfig_(configs) {
   return jsonResponse_({ status: 'ok', message: 'Tersimpan' });
 }
 
+var TIMEZONE = 'Asia/Jakarta';
+var WARNA_MASUK = '#00FF00';
+var WARNA_KELUAR = '#FF9900';
+
+/** Ambil angka murni dari string nominal, mis. "Rp1.234.000" -> 1234000. */
+function ambilAngka_(rp) {
+  return Number(String(rp || '').replace(/[^0-9]/g, '')) || 0;
+}
+
 function logTransaction_(body) {
   var result = { status: 'error', message: 'unknown error' };
 
@@ -162,23 +171,30 @@ function logTransaction_(body) {
     var sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
-      sheet.appendRow([
-        'Waktu Diterima', 'Waktu Notifikasi', 'Aplikasi', 'Paket Aplikasi',
-        'Judul', 'Isi Notifikasi', 'Nominal', 'Jenis'
-      ]);
+      sheet.appendRow(['Tanggal', 'Kode', 'Waktu Notifikasi', 'Waktu Diterima', 'Judul', 'Isi Notifikasi', 'Nominal']);
       sheet.setFrozenRows(1);
     }
 
+    var now = new Date();
+    var waktuNotifikasi = body.timestamp ? new Date(body.timestamp) : now;
+
     sheet.appendRow([
-      new Date(),
-      body.timestamp || '',
-      body.appName || '',
-      body.appPackage || '',
+      Utilities.formatDate(waktuNotifikasi, TIMEZONE, 'dd/MM/yyyy'),
+      categoryDef.key,
+      Utilities.formatDate(waktuNotifikasi, TIMEZONE, 'HH:mm:ss'),
+      Utilities.formatDate(now, TIMEZONE, 'HH:mm:ss'),
       body.title || '',
       body.text || '',
-      body.amount || '',
-      body.type || ''
+      ambilAngka_(body.amount)
     ]);
+
+    var lastRow = sheet.getLastRow();
+    var jenis = String(body.type || '').toLowerCase();
+    if (jenis === 'masuk') {
+      sheet.getRange(lastRow, 5, 1, 3).setBackground(WARNA_MASUK);
+    } else if (jenis === 'keluar') {
+      sheet.getRange(lastRow, 5, 1, 3).setBackground(WARNA_KELUAR);
+    }
 
     result.status = 'ok';
     result.message = 'Tercatat ke ' + categoryDef.label;
