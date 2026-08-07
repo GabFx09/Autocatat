@@ -10,6 +10,19 @@ import com.botcatat.notiflogger.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
 
+    private data class TargetApp(val label: String, val keywords: List<String>)
+
+    private val targetApps = listOf(
+        TargetApp("BCA", listOf("bca")),
+        TargetApp("BRI", listOf("bri")),
+        TargetApp("Mandiri", listOf("mandiri", "livin")),
+        TargetApp("BNI", listOf("bni")),
+        TargetApp("DANA", listOf("dana")),
+        TargetApp("OVO", listOf("ovo")),
+        TargetApp("LinkAja", listOf("linkaja", "link aja")),
+        TargetApp("GoPay", listOf("gojek", "gopay"))
+    )
+
     private lateinit var binding: ActivityMainBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,23 +77,37 @@ class MainActivity : AppCompatActivity() {
         packageName
     }
 
-    private fun showAppPicker() {
+    /** Cari paket aplikasi yang terpasang di HP yang label-nya cocok salah satu kata kunci target. */
+    private fun resolveInstalledPackage(keywords: List<String>): String? {
         val pm = packageManager
-        val installedApps = pm.getInstalledApplications(0)
-            .filter { pm.getLaunchIntentForPackage(it.packageName) != null }
-            .sortedBy { pm.getApplicationLabel(it).toString().lowercase() }
+        return pm.getInstalledApplications(0)
+            .firstOrNull { app ->
+                pm.getLaunchIntentForPackage(app.packageName) != null &&
+                    keywords.any { kw -> pm.getApplicationLabel(app).toString().lowercase().contains(kw) }
+            }
+            ?.packageName
+    }
 
-        val labels = installedApps.map { "${pm.getApplicationLabel(it)}  (${it.packageName})" }.toTypedArray()
-        val packageNames = installedApps.map { it.packageName }
+    private fun showAppPicker() {
+        val resolvedPackages = targetApps.map { resolveInstalledPackage(it.keywords) }
         val currentSelection = Prefs.getMonitoredPackages(this)
-        val checkedItems = packageNames.map { currentSelection.contains(it) }.toBooleanArray()
+
+        val labels = targetApps.mapIndexed { i, target ->
+            if (resolvedPackages[i] != null) target.label else "${target.label} (tidak terpasang)"
+        }.toTypedArray()
+        val checkedItems = resolvedPackages.map { it != null && currentSelection.contains(it) }.toBooleanArray()
 
         val tempSelection = currentSelection.toMutableSet()
 
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle("Pilih aplikasi bank/e-wallet")
-            .setMultiChoiceItems(labels, checkedItems) { _, which, isChecked ->
-                val pkg = packageNames[which]
+            .setMultiChoiceItems(labels, checkedItems) { dialogInterface, which, isChecked ->
+                val pkg = resolvedPackages[which]
+                if (pkg == null) {
+                    (dialogInterface as AlertDialog).listView.setItemChecked(which, false)
+                    Toast.makeText(this, "${targetApps[which].label} tidak terpasang di HP ini", Toast.LENGTH_SHORT).show()
+                    return@setMultiChoiceItems
+                }
                 if (isChecked) tempSelection.add(pkg) else tempSelection.remove(pkg)
             }
             .setPositiveButton("Simpan") { _, _ ->
@@ -88,6 +115,7 @@ class MainActivity : AppCompatActivity() {
                 refreshSelectedAppsLabel()
             }
             .setNegativeButton("Batal", null)
-            .show()
+            .create()
+        dialog.show()
     }
 }

@@ -88,9 +88,10 @@ Setelah aplikasi NotifLogger terpasang dan dibuka:
 1. **URL Web App** — tempel URL dari langkah 1.7 di atas.
 2. **Secret Key** — isi persis sama dengan `MY_SECRET` di `Code.gs`.
 3. Klik **Simpan Pengaturan**.
-4. Klik **Pilih Aplikasi**, centang aplikasi bank/e-wallet yang mau dipantau
-   (BCA, Livin by Mandiri, BRImo, GoPay, OVO, DANA, ShopeePay, dll — daftar
-   yang muncul otomatis dari aplikasi yang sudah terpasang di HP-mu).
+4. Klik **Pilih Aplikasi**, centang yang mau dipantau. Daftarnya dibatasi
+   hanya 8: **BCA, BRI, Mandiri, BNI, DANA, OVO, LinkAja, GoPay**. Aplikasi
+   yang tidak terpasang di HP akan ditandai "(tidak terpasang)" dan tidak
+   bisa dicentang.
 5. Klik **Buka Pengaturan Akses Notifikasi**, cari "NotifLogger" di daftar,
    lalu aktifkan. Ini wajib — tanpa izin ini aplikasi tidak bisa membaca
    notifikasi apa pun.

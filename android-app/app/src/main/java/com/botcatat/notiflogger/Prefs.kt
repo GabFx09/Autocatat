@@ -26,30 +26,9 @@ object Prefs {
     }
 
     fun getMonitoredPackages(context: Context): Set<String> =
-        sp(context).getStringSet(KEY_PACKAGES, DEFAULT_PACKAGES) ?: DEFAULT_PACKAGES
+        sp(context).getStringSet(KEY_PACKAGES, emptySet()) ?: emptySet()
 
     fun setMonitoredPackages(context: Context, packages: Set<String>) {
         sp(context).edit().putStringSet(KEY_PACKAGES, packages).apply()
     }
-
-    // Tebakan awal paket bank/e-wallet populer di Indonesia. Pengguna sebaiknya
-    // tetap mengecek & menyesuaikan lewat "Pilih Aplikasi" di MainActivity karena
-    // nama paket bisa berubah antar versi app.
-    val DEFAULT_PACKAGES: Set<String> = setOf(
-        "com.bca.mybca",
-        "id.co.bri.brimo",
-        "com.bnimobilebanking.digital",
-        "id.co.bankmandiri.livin",
-        "com.bankmandiri.livinmerchant",
-        "com.jenius.bankbtpn",
-        "com.cimbniaga.octoclicks",
-        "com.gojek.app",
-        "com.gojek.gopay",
-        "id.dana",
-        "com.dana",
-        "com.shopee.pay",
-        "com.telkomsel.tcash",
-        "com.linkaja",
-        "ovo.id"
-    )
 }
