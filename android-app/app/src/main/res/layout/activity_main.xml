@@ -119,5 +119,55 @@
 
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/card_luxury"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Keandalan Latar Belakang"
+                style="@style/Text.SectionTitle" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Supaya notifikasi tetap tercatat walau HP terkunci lama, matikan optimasi baterai dan aktifkan autostart untuk NotifLogger."
+                style="@style/Text.Body" />
+
+            <Button
+                android:id="@+id/btn_battery_optimization"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="Matikan Optimasi Baterai"
+                style="@style/Button.Gold" />
+
+            <TextView
+                android:id="@+id/text_battery_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:fontFamily="@font/montserrat"
+                android:textStyle="bold"
+                android:textSize="12sp"
+                android:letterSpacing="0.04"
+                android:text="STATUS: OPTIMASI BATERAI MASIH AKTIF" />
+
+            <Button
+                android:id="@+id/btn_autostart"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="Buka Pengaturan Autostart HP"
+                style="@style/Button.Gold" />
+
+        </LinearLayout>
+
     </LinearLayout>
 </ScrollView>
