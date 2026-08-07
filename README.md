@@ -70,23 +70,31 @@ di tiap HP.
 > **Deploy > Manage deployments > edit (pensil) > Version: New version >
 > Deploy** agar perubahan aktif di URL yang sama (tidak perlu ubah
 > `Config.kt` lagi kalau URL-nya tidak berubah).
+>
+> Catatan izin: backend sekarang membaca daftar Spreadsheet dari Google
+> Drive-mu untuk ditampilkan sebagai dropdown, jadi saat deploy/redeploy
+> Google mungkin minta izin akses Drive yang lebih luas — klik **Allow**
+> seperti biasa.
 
-## 2. Atur Panel admin — hubungkan tiap bank/e-wallet ke Google Sheet-nya
+## 2. Atur Panel admin — hubungkan tiap bank/e-wallet ke Spreadsheet & Sheet-nya
 
-1. Buka URL Web App dari langkah 1.4 di atas **langsung di browser komputer**
-   (bukan dari aplikasi Android) — akan muncul halaman **Panel NotifLogger**
-   dengan 8 bagian: BCA, BRI, Mandiri, BNI, DANA, OVO, LinkAja, GoPay.
-2. Untuk tiap bank/e-wallet yang mau dicatat, isi:
-   - **Link Google Sheet terhubung** — link Google Sheet tujuan (boleh sama
-     untuk semua, boleh beda-beda per bank)
-   - **Nama Sheet/Tab terhubung** — nama tab di dalam Sheet itu (kalau
-     belum ada, akan dibuat otomatis beserta header kolomnya saat data
-     pertama masuk)
+Panel ini bisa dibuka dari **browser komputer** (via URL Web App langsung)
+maupun dari **aplikasi Android** (tombol "Pilih Aplikasi") — keduanya
+memakai dropdown yang sama, tidak perlu paste link sama sekali.
+
+1. Buka URL Web App dari langkah 1.4 di atas **di browser komputer** — akan
+   muncul halaman **Panel NotifLogger** dengan 8 bagian: BCA, BRI, Mandiri,
+   BNI, DANA, OVO, LinkAja, GoPay.
+2. Untuk tiap bank/e-wallet yang mau dicatat, pilih dari dropdown:
+   - **Spreadsheet** — daftar semua Google Sheet yang ada di Drive akun ini
+   - **Sheet/Tab** — daftar tab di dalam Spreadsheet yang baru dipilih
+     (muncul otomatis setelah Spreadsheet dipilih; kalau tabnya belum ada,
+     akan dibuat otomatis beserta header kolom saat data pertama masuk)
 3. Klik **Simpan Semua**.
 
-Kapan pun kamu mau pindah Sheet tujuan salah satu bank (atau semuanya),
-tinggal buka lagi Panel ini dari komputer dan ubah — tidak perlu sentuh
-aplikasi Android maupun HP sama sekali.
+Kapan pun kamu mau pindah Spreadsheet/Sheet tujuan salah satu bank (atau
+semuanya), tinggal buka lagi Panel ini dan pilih ulang dari dropdown —
+tidak perlu sentuh source code maupun HP sama sekali.
 
 ## 3. Build & install aplikasi Android
 
@@ -106,27 +114,31 @@ Android Studio** di atas.
 Setelah aplikasi NotifLogger terpasang dan dibuka — tidak ada URL yang perlu
 diisi sama sekali:
 
-1. Klik **Pilih Aplikasi**. Aplikasi akan mengambil status koneksi terbaru
-   dari server, lalu menampilkan 8 pilihan (BCA, BRI, Mandiri, BNI, DANA,
-   OVO, LinkAja, GoPay) beserta nama Google Sheet & tab yang sedang
-   terhubung untuk masing-masing (atau "(belum terhubung)" kalau belum
-   diatur di Panel). Aplikasi yang tidak terpasang di HP ditandai "(tidak
-   terpasang)" dan tidak bisa dicentang.
-2. Centang yang mau dipantau, klik **Simpan**.
-3. Klik **Buka Pengaturan Akses Notifikasi**, cari "NotifLogger" di daftar,
-   lalu aktifkan. Ini wajib — tanpa izin ini aplikasi tidak bisa membaca
-   notifikasi apa pun.
-4. Kembali ke aplikasi, pastikan status menunjukkan "akses notifikasi AKTIF".
+1. Klik **Pilih Aplikasi**. Akan terbuka layar dengan 8 kartu (BCA, BRI,
+   Mandiri, BNI, DANA, OVO, LinkAja, GoPay), masing-masing berisi:
+   - **Toggle ON/OFF** — aktifkan untuk bank/e-wallet yang mau dipantau
+     (nonaktif otomatis kalau aplikasinya tidak terpasang di HP ini)
+   - **Dropdown Spreadsheet** — pilih Google Sheet tujuan dari daftar
+   - **Dropdown Sheet/Tab** — pilih tab tujuan (muncul otomatis setelah
+     Spreadsheet dipilih)
+2. Atur semua yang perlu, klik **Simpan** di bagian bawah layar — ini
+   menyimpan pilihan aplikasi ke HP dan Spreadsheet/Sheet tujuan ke server
+   sekaligus.
+3. Kembali ke layar utama, klik **Buka Pengaturan Akses Notifikasi**, cari
+   "NotifLogger" di daftar, lalu aktifkan. Ini wajib — tanpa izin ini
+   aplikasi tidak bisa membaca notifikasi apa pun.
+4. Pastikan status menunjukkan "akses notifikasi AKTIF".
 
-(Ada juga tombol **"Buka Panel (Atur Sheet Tujuan)"** di aplikasi sebagai
-jalan pintas membuka Panel admin di browser HP, tapi mengatur Sheet tujuan
-lebih nyaman dilakukan dari komputer seperti langkah 2 di atas.)
+(Ada juga tombol **"Buka Panel (Atur Sheet Tujuan)"** di layar utama sebagai
+jalan pintas membuka Panel yang sama di browser HP — berguna kalau mau atur
+tanpa app terbuka, misalnya dibagikan ke orang lain yang memegang HP tapi
+tidak install app-nya.)
 
 Setelah itu, setiap kali ada notifikasi masuk dari salah satu dari 8 aplikasi
-yang kamu pilih, NotifLogger otomatis mengirimkannya ke Google Sheet yang
-sudah dihubungkan untuk bank/e-wallet itu di Panel — baris baru berisi
-waktu, nama aplikasi, judul & isi notifikasi, nominal (jika terdeteksi), dan
-jenis transaksi (Masuk/Keluar, best-effort dari kata kunci).
+yang kamu aktifkan, NotifLogger otomatis mengirimkannya ke Spreadsheet &
+Sheet yang sudah dipilih untuk bank/e-wallet itu — baris baru berisi waktu,
+nama aplikasi, judul & isi notifikasi, nominal (jika terdeteksi), dan jenis
+transaksi (Masuk/Keluar, best-effort dari kata kunci).
 
 ## Catatan keamanan & keterbatasan
 
@@ -134,11 +146,13 @@ jenis transaksi (Masuk/Keluar, best-effort dari kata kunci).
   source code (`Config.kt`) yang bisa dilihat siapa saja, dan juga bisa
   diekstrak dari APK yang didownload publik. Konsekuensinya: siapa pun yang
   menemukan URL ini secara teknis bisa mengirim baris data palsu ke
-  Sheet-mu, dan endpoint status (`?format=json`) membocorkan judul dokumen
-  Google Sheet yang terhubung per bank (bukan isi datanya). Ini trade-off
-  yang disengaja demi kemudahan (tidak perlu isi apa pun di app) — kalau
-  suatu saat mau menutup celah ini, opsinya adalah membuat repo Private
-  kembali (konsekuensi: download APK dari Releases perlu login GitHub).
+  Sheet-mu, dan endpoint `?format=json&action=list_spreadsheets` membocorkan
+  **nama semua Google Sheet yang ada di Drive akun ini** (bukan isi
+  datanya) supaya bisa ditampilkan sebagai dropdown. Kalau nama-nama
+  dokumen Google Drive-mu ada yang sensitif, pertimbangkan untuk membuat
+  repo Private (konsekuensi: download APK dari Releases perlu login GitHub)
+  — ini trade-off yang disengaja demi kemudahan (tidak perlu isi/paste apa
+  pun secara manual).
 - **Izin akses notifikasi bersifat luas** — begitu diaktifkan, Android
   memberi aplikasi akses baca ke SEMUA notifikasi di HP. NotifLogger hanya
   memproses & mengirim notifikasi dari salah satu dari 8 aplikasi yang kamu

@@ -21,6 +21,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".BankConfigActivity"
+            android:exported="false"
+            android:label="Pilih Aplikasi &amp; Sheet Tujuan" />
+
         <service
             android:name=".NotificationLoggerService"
             android:label="@string/app_name"

@@ -1,12 +1,13 @@
 /**
- * Backend pencatat notifikasi bank/e-wallet ke Google Sheets, dengan panel
- * pengaturan supaya tiap aplikasi (BCA, BRI, Mandiri, BNI, DANA, OVO,
- * LinkAja, GoPay) bisa dihubungkan ke Google Sheet & nama tab-nya
- * masing-masing -- dan bisa diganti kapan saja tanpa mengubah apa pun di
- * aplikasi Android.
+ * Backend pencatat notifikasi bank/e-wallet ke Google Sheets, dengan Panel
+ * admin (bisa dibuka dari browser komputer ATAU dari aplikasi Android)
+ * untuk memilih Spreadsheet & Sheet/tab tujuan tiap bank/e-wallet lewat
+ * dropdown -- tidak perlu paste link sama sekali.
  *
- * Struktur: BCA -> Sheet terhubung -> Tab terhubung, BRI -> Sheet terhubung
- * -> Tab terhubung, dst -- semuanya diatur lewat panel ini.
+ * Struktur: BCA -> pilih Spreadsheet -> pilih Sheet, BRI -> pilih
+ * Spreadsheet -> pilih Sheet, dst -- semuanya bisa diganti kapan saja tanpa
+ * mengubah apa pun di aplikasi Android (aplikasi otomatis ambil pengaturan
+ * terbaru tiap kali membuka layar konfigurasi).
  *
  * Cara pakai:
  * 1. Buka https://script.google.com, buat project baru (atau lewat
@@ -17,13 +18,13 @@
  * 3. Salin "Web app URL" hasil deploy. URL ini ditanam langsung di source
  *    code aplikasi Android (lihat Config.kt) saat di-build -- pengguna app
  *    tidak pernah perlu mengisi URL apa pun.
- * 4. Buka URL yang sama itu di browser (bukan dari app) -- akan muncul
- *    Panel Pengaturan dengan 8 bagian (satu per bank/e-wallet). Isi link
- *    Google Sheet & nama tab untuk masing-masing, klik Simpan Semua.
+ * 4. Buka URL yang sama itu di browser (Panel admin), atau lewat tombol
+ *    "Pilih Aplikasi" di aplikasi Android -- pilih Spreadsheet & Sheet
+ *    tujuan tiap bank/e-wallet dari dropdown.
  *
- * Setiap kali kamu mau pindah/ganti Sheet tujuan salah satu bank/e-wallet,
- * cukup buka lagi panel ini dan ubah linknya -- semua HP yang sudah
- * terpasang otomatis ikut tanpa perlu disetel ulang.
+ * Catatan izin: karena sekarang membaca daftar Spreadsheet dari Google
+ * Drive-mu (DriveApp), saat pertama kali deploy/otorisasi ulang Google akan
+ * minta izin akses Drive yang lebih luas -- klik Allow seperti biasa.
  */
 
 var CATEGORIES = [
@@ -38,116 +39,107 @@ var CATEGORIES = [
 ];
 
 function doGet(e) {
-  var props = PropertiesService.getScriptProperties();
+  var action = e.parameter.action || '';
 
   if (e.parameter.format === 'json') {
-    return jsonResponse_(buildStatus_(props));
-  }
-
-  var hasAnyParam = CATEGORIES.some(function (c) {
-    return e.parameter['url_' + c.key] !== undefined;
-  });
-
-  if (hasAnyParam) {
-    CATEGORIES.forEach(function (c) {
-      var url = (e.parameter['url_' + c.key] || '').trim();
-      var sheetName = (e.parameter['sheet_' + c.key] || c.label).trim();
-      props.setProperty('SPREADSHEET_URL_' + c.key, url);
-      props.setProperty('SHEET_NAME_' + c.key, sheetName);
-    });
+    if (action === 'list_spreadsheets') return jsonResponse_(listSpreadsheets_());
+    if (action === 'list_sheets') return jsonResponse_(listSheetNames_(e.parameter.spreadsheetId || ''));
+    return jsonResponse_(buildStatus_());
   }
 
   return HtmlService
-    .createHtmlOutput(renderPanel_(props, hasAnyParam))
+    .createHtmlOutput(renderPanel_())
     .setTitle('Panel NotifLogger')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-/** Status koneksi tiap kategori untuk ditampilkan di aplikasi Android (read-only). */
-function buildStatus_(props) {
+function doPost(e) {
+  var body;
+  try {
+    body = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return jsonResponse_({ status: 'error', message: 'Body tidak valid: ' + err });
+  }
+
+  if (body.action === 'save_config') {
+    return saveConfig_(body.configs || {});
+  }
+
+  return logTransaction_(body);
+}
+
+/** Daftar semua Google Sheet yang ada di Drive akun ini, untuk dropdown. */
+function listSpreadsheets_() {
+  var files = DriveApp.getFilesByType(MimeType.GOOGLE_SHEETS);
+  var result = [];
+  while (files.hasNext() && result.length < 300) {
+    var f = files.next();
+    result.push({ id: f.getId(), name: f.getName() });
+  }
+  result.sort(function (a, b) { return a.name.localeCompare(b.name); });
+  return result;
+}
+
+/** Nama-nama tab/sheet di dalam satu Spreadsheet, untuk dropdown. */
+function listSheetNames_(spreadsheetId) {
+  if (!spreadsheetId) return [];
+  try {
+    return SpreadsheetApp.openById(spreadsheetId).getSheets().map(function (s) {
+      return s.getName();
+    });
+  } catch (err) {
+    return [];
+  }
+}
+
+/** Status koneksi tiap kategori (Spreadsheet & Sheet yang sedang aktif). */
+function buildStatus_() {
+  var props = PropertiesService.getScriptProperties();
   var status = {};
+
   CATEGORIES.forEach(function (c) {
-    var url = props.getProperty('SPREADSHEET_URL_' + c.key) || '';
-    var sheetName = props.getProperty('SHEET_NAME_' + c.key) || c.label;
-    var id = url ? extractSpreadsheetId_(url) : null;
-    var docName = '';
+    var spreadsheetId = props.getProperty('SPREADSHEET_ID_' + c.key) || '';
+    var sheetName = props.getProperty('SHEET_NAME_' + c.key) || '';
+    var spreadsheetName = '';
     var connected = false;
 
-    if (id) {
+    if (spreadsheetId) {
       try {
-        docName = SpreadsheetApp.openById(id).getName();
+        spreadsheetName = SpreadsheetApp.openById(spreadsheetId).getName();
         connected = true;
       } catch (err) {
-        docName = '';
         connected = false;
       }
     }
 
-    status[c.key] = { docName: docName, sheetName: sheetName, connected: connected };
+    status[c.key] = {
+      spreadsheetId: spreadsheetId,
+      spreadsheetName: spreadsheetName,
+      sheetName: sheetName,
+      connected: connected
+    };
   });
+
   return status;
 }
 
-function renderPanel_(props, justSaved) {
-  var notice = justSaved
-    ? '<p class="notice">Tersimpan. Semua HP otomatis memakai pengaturan baru ini.</p>'
-    : '';
+function saveConfig_(configs) {
+  var props = PropertiesService.getScriptProperties();
 
-  var rows = CATEGORIES.map(function (c) {
-    var url = props.getProperty('SPREADSHEET_URL_' + c.key) || '';
-    var sheetName = props.getProperty('SHEET_NAME_' + c.key) || c.label;
-    return '<fieldset>' +
-      '<legend>' + c.label + '</legend>' +
-      '<label>Link Google Sheet terhubung</label>' +
-      '<input type="text" name="url_' + c.key + '" value="' + escapeHtml_(url) + '" ' +
-      'placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">' +
-      '<label>Nama Sheet/Tab terhubung</label>' +
-      '<input type="text" name="sheet_' + c.key + '" value="' + escapeHtml_(sheetName) + '" ' +
-      'placeholder="' + c.label + '">' +
-      '</fieldset>';
-  }).join('');
+  CATEGORIES.forEach(function (c) {
+    var cfg = configs[c.key];
+    if (!cfg) return;
+    props.setProperty('SPREADSHEET_ID_' + c.key, cfg.spreadsheetId || '');
+    props.setProperty('SHEET_NAME_' + c.key, cfg.sheetName || '');
+  });
 
-  return '<!DOCTYPE html><html><head><style>' +
-    'body{font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:40px auto;padding:0 16px;color:#222}' +
-    'h2{margin-bottom:4px}' +
-    '.notice{background:#e8f5e9;color:#1b5e20;padding:10px 12px;border-radius:6px}' +
-    'fieldset{margin-top:16px;border:1px solid #ddd;border-radius:6px;padding:12px}' +
-    'legend{font-weight:bold;padding:0 6px}' +
-    'label{display:block;margin-top:10px;font-size:13px;font-weight:bold}' +
-    'input{width:100%;padding:8px;box-sizing:border-box;margin-top:4px;font-size:14px;' +
-    'border:1px solid #ccc;border-radius:4px}' +
-    'button{margin-top:24px;padding:12px 24px;background:#1b5e20;color:#fff;border:none;' +
-    'border-radius:4px;font-size:14px;cursor:pointer}' +
-    'small{color:#666}' +
-    '</style></head><body>' +
-    '<h2>Panel NotifLogger</h2>' +
-    '<small>Hubungkan tiap bank/e-wallet ke Google Sheet & tab tujuannya masing-masing.</small>' +
-    notice +
-    '<form method="get">' +
-    rows +
-    '<button type="submit">Simpan Semua</button>' +
-    '</form>' +
-    '</body></html>';
+  return jsonResponse_({ status: 'ok', message: 'Tersimpan' });
 }
 
-function escapeHtml_(text) {
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function extractSpreadsheetId_(url) {
-  var match = url.match(/[-\w]{25,}/);
-  return match ? match[0] : null;
-}
-
-function doPost(e) {
+function logTransaction_(body) {
   var result = { status: 'error', message: 'unknown error' };
 
   try {
-    var body = JSON.parse(e.postData.contents);
     var category = String(body.category || '').toUpperCase();
     var props = PropertiesService.getScriptProperties();
 
@@ -157,22 +149,16 @@ function doPost(e) {
       return jsonResponse_(result);
     }
 
-    var spreadsheetUrl = props.getProperty('SPREADSHEET_URL_' + category);
+    var spreadsheetId = props.getProperty('SPREADSHEET_ID_' + category);
     var sheetName = props.getProperty('SHEET_NAME_' + category) || categoryDef.label;
 
-    if (!spreadsheetUrl) {
-      result.message = 'Belum ada Google Sheet untuk ' + categoryDef.label +
-        '. Buka URL Web App ini di browser untuk mengatur panel dulu.';
+    if (!spreadsheetId) {
+      result.message = 'Belum ada Spreadsheet untuk ' + categoryDef.label +
+        '. Atur dulu lewat "Pilih Aplikasi" di aplikasi Android atau Panel di browser.';
       return jsonResponse_(result);
     }
 
-    var id = extractSpreadsheetId_(spreadsheetUrl);
-    if (!id) {
-      result.message = 'Link Google Sheet untuk ' + categoryDef.label + ' tidak valid.';
-      return jsonResponse_(result);
-    }
-
-    var ss = SpreadsheetApp.openById(id);
+    var ss = SpreadsheetApp.openById(spreadsheetId);
     var sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
@@ -201,6 +187,98 @@ function doPost(e) {
   }
 
   return jsonResponse_(result);
+}
+
+function renderPanel_() {
+  var props = PropertiesService.getScriptProperties();
+  var spreadsheets = listSpreadsheets_();
+  var selfUrl = ScriptApp.getService().getUrl();
+
+  var spreadsheetOptions = spreadsheets.map(function (s) {
+    return '<option value="' + s.id + '">' + escapeHtml_(s.name) + '</option>';
+  }).join('');
+
+  var initialData = {};
+  var rows = CATEGORIES.map(function (c) {
+    var spreadsheetId = props.getProperty('SPREADSHEET_ID_' + c.key) || '';
+    var sheetName = props.getProperty('SHEET_NAME_' + c.key) || '';
+    initialData[c.key] = { spreadsheetId: spreadsheetId, sheetName: sheetName };
+
+    return '<fieldset>' +
+      '<legend>' + c.label + '</legend>' +
+      '<label>Spreadsheet</label>' +
+      '<select class="ss-select" data-key="' + c.key + '">' +
+      '<option value="">-- Pilih Spreadsheet --</option>' + spreadsheetOptions +
+      '</select>' +
+      '<label>Sheet/Tab</label>' +
+      '<select class="sheet-select" data-key="' + c.key + '">' +
+      '<option value="">-- Pilih Sheet --</option>' +
+      '</select>' +
+      '</fieldset>';
+  }).join('');
+
+  return '<!DOCTYPE html><html><head><style>' +
+    'body{font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:40px auto;padding:0 16px;color:#222}' +
+    'h2{margin-bottom:4px}' +
+    '.notice{background:#e8f5e9;color:#1b5e20;padding:10px 12px;border-radius:6px}' +
+    'fieldset{margin-top:16px;border:1px solid #ddd;border-radius:6px;padding:12px}' +
+    'legend{font-weight:bold;padding:0 6px}' +
+    'label{display:block;margin-top:10px;font-size:13px;font-weight:bold}' +
+    'select{width:100%;padding:8px;box-sizing:border-box;margin-top:4px;font-size:14px;' +
+    'border:1px solid #ccc;border-radius:4px;background:#fff}' +
+    'button{margin-top:24px;padding:12px 24px;background:#1b5e20;color:#fff;border:none;' +
+    'border-radius:4px;font-size:14px;cursor:pointer}' +
+    'small{color:#666}' +
+    '</style></head><body>' +
+    '<h2>Panel NotifLogger</h2>' +
+    '<small>Hubungkan tiap bank/e-wallet ke Spreadsheet & Sheet tujuannya masing-masing.</small>' +
+    '<div id="notice"></div>' +
+    '<form id="panelForm">' + rows + '<button type="submit">Simpan Semua</button></form>' +
+    '<script>' +
+    'var SELF_URL = ' + JSON.stringify(selfUrl) + ';' +
+    'var INITIAL = ' + JSON.stringify(initialData) + ';' +
+    'function loadSheets(key, spreadsheetId, selectedSheet) {' +
+    '  var sheetSelect = document.querySelector(".sheet-select[data-key=\\"" + key + "\\"]");' +
+    '  if (!spreadsheetId) { sheetSelect.innerHTML = "<option value=\\"\\">-- Pilih Sheet --</option>"; return; }' +
+    '  sheetSelect.innerHTML = "<option value=\\"\\">Memuat...</option>";' +
+    '  fetch(SELF_URL + "?format=json&action=list_sheets&spreadsheetId=" + encodeURIComponent(spreadsheetId))' +
+    '    .then(function(r){ return r.json(); })' +
+    '    .then(function(names){' +
+    '      sheetSelect.innerHTML = "<option value=\\"\\">-- Pilih Sheet --</option>" +' +
+    '        names.map(function(n){ return "<option value=\\"" + n + "\\"" + (n === selectedSheet ? " selected" : "") + ">" + n + "</option>"; }).join("");' +
+    '    });' +
+    '}' +
+    'document.querySelectorAll(".ss-select").forEach(function(sel){' +
+    '  var key = sel.getAttribute("data-key");' +
+    '  var init = INITIAL[key];' +
+    '  if (init && init.spreadsheetId) {' +
+    '    sel.value = init.spreadsheetId;' +
+    '    loadSheets(key, init.spreadsheetId, init.sheetName);' +
+    '  }' +
+    '  sel.addEventListener("change", function(){ loadSheets(key, sel.value, ""); });' +
+    '});' +
+    'document.getElementById("panelForm").addEventListener("submit", function(ev){' +
+    '  ev.preventDefault();' +
+    '  var configs = {};' +
+    '  document.querySelectorAll(".ss-select").forEach(function(sel){' +
+    '    var key = sel.getAttribute("data-key");' +
+    '    var sheetSel = document.querySelector(".sheet-select[data-key=\\"" + key + "\\"]");' +
+    '    configs[key] = { spreadsheetId: sel.value, sheetName: sheetSel.value };' +
+    '  });' +
+    '  fetch(SELF_URL, { method: "POST", body: JSON.stringify({ action: "save_config", configs: configs }) })' +
+    '    .then(function(r){ return r.json(); })' +
+    '    .then(function(res){ document.getElementById("notice").innerHTML = "<p class=\\"notice\\">" + res.message + "</p>"; });' +
+    '});' +
+    '</script>' +
+    '</body></html>';
+}
+
+function escapeHtml_(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function jsonResponse_(obj) {
