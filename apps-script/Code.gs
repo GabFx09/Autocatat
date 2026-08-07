@@ -273,9 +273,9 @@ function logTransaction_(body) {
     var nominal = ambilAngka_(body.amount);
     var jenis = String(body.type || '').toLowerCase();
 
-    // Kolom C (Jam Catat), D (Jam Kasih), E (User ID) sengaja tidak ditulis --
-    // User ID dikosongkan untuk transaksi otomatis, Jam Catat/Jam Kasih
-    // biar tetap diisi manual lewat onEdit seperti alur kerja yang sudah ada.
+    // Kolom D (Jam Kasih) dan E (User ID) sengaja tidak ditulis -- User ID
+    // dikosongkan untuk transaksi otomatis, Jam Kasih baru terisi manual
+    // lewat onEdit begitu User ID diisi orang.
     sheet.getRange(targetRow, 1).setValue(Utilities.formatDate(waktuNotifikasi, TIMEZONE, 'dd/MM/yyyy'));
     sheet.getRange(targetRow, 2).setValue(categoryDef.key);
     sheet.getRange(targetRow, 6).setValue(namaRekBank);
@@ -287,6 +287,10 @@ function logTransaction_(body) {
     } else {
       sheet.getRange(targetRow, 7).setValue(nominal);
       sheet.getRange(targetRow, 6, 1, 2).setBackground(WARNA_MASUK);
+      // Nama Rek Bank & Credit sudah terisi -> Jam Catat otomatis terisi juga,
+      // sama seperti aturan onEdit -- ditulis langsung di sini karena onEdit
+      // tidak terpicu untuk penulisan otomatis dari script.
+      sheet.getRange(targetRow, 3).setValue(Utilities.formatDate(now, TIMEZONE, 'HH:mm:ss'));
     }
 
     result.status = 'ok';
