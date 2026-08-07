@@ -73,9 +73,18 @@ class BankConfigActivity : AppCompatActivity() {
                 item.textNotInstalled.text = ""
             }
 
+            updateCardBorder(item)
+            item.switchEnabled.setOnCheckedChangeListener { _, _ -> updateCardBorder(item) }
+
             binding.containerCards.addView(item.root)
             cardBindings[target.key] = item
         }
+    }
+
+    private fun updateCardBorder(item: ItemBankConfigBinding) {
+        item.root.setBackgroundResource(
+            if (item.switchEnabled.isChecked) R.drawable.card_luxury_active else R.drawable.card_luxury
+        )
     }
 
     private fun loadData() {
@@ -86,7 +95,7 @@ class BankConfigActivity : AppCompatActivity() {
             spreadsheets = fetchedSpreadsheets
             binding.btnSave.isEnabled = true
 
-            val spreadsheetOptions = listOf("-- Pilih Spreadsheet --") + spreadsheets.map { it.name }
+            val spreadsheetOptions = listOf("Pilih Spreadsheet") + spreadsheets.map { it.name }
             val spreadsheetAdapter = ArrayAdapter(this@BankConfigActivity, android.R.layout.simple_spinner_dropdown_item, spreadsheetOptions)
 
             targetApps.forEach { target ->
@@ -104,7 +113,7 @@ class BankConfigActivity : AppCompatActivity() {
                     override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                         if (position <= 0) {
                             item.spinnerSheet.adapter = ArrayAdapter(
-                                this@BankConfigActivity, android.R.layout.simple_spinner_dropdown_item, listOf("-- Pilih Sheet --")
+                                this@BankConfigActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Pilih Sheet")
                             )
                             return
                         }
@@ -121,7 +130,7 @@ class BankConfigActivity : AppCompatActivity() {
         val item = cardBindings[key] ?: return
         lifecycleScope.launch {
             val sheetNames = withContext(Dispatchers.IO) { Api.listSheets(spreadsheetId) }
-            val options = listOf("-- Pilih Sheet --") + sheetNames
+            val options = listOf("Pilih Sheet") + sheetNames
             item.spinnerSheet.adapter = ArrayAdapter(this@BankConfigActivity, android.R.layout.simple_spinner_dropdown_item, options)
             val idx = sheetNames.indexOf(preselectSheet)
             if (idx >= 0) item.spinnerSheet.setSelection(idx + 1)

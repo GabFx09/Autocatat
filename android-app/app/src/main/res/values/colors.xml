@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema mewah keemasan -->
+    <color name="black_luxury">#0D0B08</color>
+    <color name="surface_dark">#1A1611</color>
+    <color name="surface_elevated">#221C14</color>
+    <color name="divider_dark">#3A3327</color>
+
+    <color name="gold">#D4AF37</color>
+    <color name="gold_light">#F1D98B</color>
+    <color name="gold_deep">#9C7A24</color>
+
+    <color name="ivory">#F5EFE0</color>
+    <color name="muted_gold_gray">#B8AD94</color>
+
+    <color name="success_sage">#4CAF7D</color>
+    <color name="error_brick">#C75450</color>
+</resources>

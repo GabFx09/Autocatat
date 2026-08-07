@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#F5F5F5"
+    android:background="@drawable/card_luxury"
     android:padding="16dp"
     android:layout_marginTop="12dp">
 
@@ -19,14 +19,18 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textSize="16sp"
+            android:fontFamily="@font/playfair_display"
             android:textStyle="bold"
+            android:textColor="@color/ivory"
+            android:textSize="17sp"
             tools:text="BCA" />
 
         <Switch
             android:id="@+id/switch_enabled"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:thumbTint="@color/gold"
+            android:trackTint="@color/gold_deep" />
 
     </LinearLayout>
 
@@ -34,33 +38,43 @@
         android:id="@+id/text_not_installed"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="#B00020"
+        android:layout_marginTop="2dp"
+        android:fontFamily="@font/montserrat"
+        android:textColor="@color/error_brick"
         android:textSize="12sp" />
 
     <TextView
+        style="@style/Text.Label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="Spreadsheet"
-        android:textSize="12sp"
-        android:textStyle="bold" />
+        android:layout_marginTop="14dp"
+        android:text="Spreadsheet" />
 
     <Spinner
         android:id="@+id/spinner_spreadsheet"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:minHeight="44dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:background="@drawable/spinner_background" />
 
     <TextView
+        style="@style/Text.Label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="Sheet/Tab"
-        android:textSize="12sp"
-        android:textStyle="bold" />
+        android:layout_marginTop="10dp"
+        android:text="Sheet / Tab" />
 
     <Spinner
         android:id="@+id/spinner_sheet"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:minHeight="44dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:background="@drawable/spinner_background" />
 
 </LinearLayout>

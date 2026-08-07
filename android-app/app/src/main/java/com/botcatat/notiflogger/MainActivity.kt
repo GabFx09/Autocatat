@@ -1,11 +1,10 @@
 package com.botcatat.notiflogger
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.botcatat.notiflogger.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -23,14 +22,6 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, BankConfigActivity::class.java))
         }
 
-        binding.btnOpenPanel.setOnClickListener {
-            if (!Config.PANEL_URL.startsWith("https://")) {
-                Toast.makeText(this, "Aplikasi belum di-build dengan URL panel yang valid", Toast.LENGTH_SHORT).show()
-            } else {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Config.PANEL_URL)))
-            }
-        }
-
         binding.btnNotifAccess.setOnClickListener {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
@@ -39,10 +30,13 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshSelectedAppsLabel()
-        binding.textStatus.text = if (isNotificationAccessGranted()) {
-            "Status: akses notifikasi AKTIF"
+
+        if (isNotificationAccessGranted()) {
+            binding.textStatus.text = "STATUS: AKSES NOTIFIKASI AKTIF"
+            binding.textStatus.setTextColor(ContextCompat.getColor(this, R.color.success_sage))
         } else {
-            "Status: akses notifikasi BELUM diaktifkan"
+            binding.textStatus.text = "STATUS: BELUM DIAKTIFKAN"
+            binding.textStatus.setTextColor(ContextCompat.getColor(this, R.color.error_brick))
         }
     }
 
