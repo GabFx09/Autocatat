@@ -145,6 +145,24 @@ function ambilAngka_(rp) {
   return Number(String(rp || '').replace(/[^0-9]/g, '')) || 0;
 }
 
+/**
+ * Baris terakhir yang benar-benar berisi data di kolom A. Dipakai alih-alih
+ * sheet.getLastRow() biasa karena sheet dengan format/formula bawaan (mis.
+ * template kas) bisa membuat getLastRow() mengira ratusan baris kosong di
+ * bawahnya "terpakai", sehingga data baru nyasar jauh ke bawah.
+ */
+function lastRowInColumnA_(sheet) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow === 0) return 0;
+  var values = sheet.getRange(1, 1, lastRow, 1).getValues();
+  for (var i = values.length - 1; i >= 0; i--) {
+    if (values[i][0] !== '' && values[i][0] !== null) {
+      return i + 1;
+    }
+  }
+  return 0;
+}
+
 function logTransaction_(body) {
   var result = { status: 'error', message: 'unknown error' };
 
@@ -177,8 +195,9 @@ function logTransaction_(body) {
 
     var now = new Date();
     var waktuNotifikasi = body.timestamp ? new Date(body.timestamp) : now;
+    var targetRow = lastRowInColumnA_(sheet) + 1;
 
-    sheet.appendRow([
+    sheet.getRange(targetRow, 1, 1, 7).setValues([[
       Utilities.formatDate(waktuNotifikasi, TIMEZONE, 'dd/MM/yyyy'),
       categoryDef.key,
       Utilities.formatDate(waktuNotifikasi, TIMEZONE, 'HH:mm:ss'),
@@ -186,14 +205,13 @@ function logTransaction_(body) {
       body.title || '',
       body.text || '',
       ambilAngka_(body.amount)
-    ]);
+    ]]);
 
-    var lastRow = sheet.getLastRow();
     var jenis = String(body.type || '').toLowerCase();
     if (jenis === 'masuk') {
-      sheet.getRange(lastRow, 5, 1, 3).setBackground(WARNA_MASUK);
+      sheet.getRange(targetRow, 5, 1, 3).setBackground(WARNA_MASUK);
     } else if (jenis === 'keluar') {
-      sheet.getRange(lastRow, 5, 1, 3).setBackground(WARNA_KELUAR);
+      sheet.getRange(targetRow, 5, 1, 3).setBackground(WARNA_KELUAR);
     }
 
     result.status = 'ok';
