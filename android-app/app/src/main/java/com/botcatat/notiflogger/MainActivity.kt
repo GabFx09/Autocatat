@@ -2,6 +2,7 @@ package com.botcatat.notiflogger
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
@@ -10,17 +11,17 @@ import com.botcatat.notiflogger.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
 
-    private data class TargetApp(val label: String, val keywords: List<String>)
+    private data class TargetApp(val label: String, val key: String, val keywords: List<String>)
 
     private val targetApps = listOf(
-        TargetApp("BCA", listOf("bca")),
-        TargetApp("BRI", listOf("bri")),
-        TargetApp("Mandiri", listOf("mandiri", "livin")),
-        TargetApp("BNI", listOf("bni")),
-        TargetApp("DANA", listOf("dana")),
-        TargetApp("OVO", listOf("ovo")),
-        TargetApp("LinkAja", listOf("linkaja", "link aja")),
-        TargetApp("GoPay", listOf("gojek", "gopay"))
+        TargetApp("BCA", "BCA", listOf("bca")),
+        TargetApp("BRI", "BRI", listOf("bri")),
+        TargetApp("Mandiri", "MANDIRI", listOf("mandiri", "livin")),
+        TargetApp("BNI", "BNI", listOf("bni")),
+        TargetApp("DANA", "DANA", listOf("dana")),
+        TargetApp("OVO", "OVO", listOf("ovo")),
+        TargetApp("LinkAja", "LINKAJA", listOf("linkaja", "link aja")),
+        TargetApp("GoPay", "GOPAY", listOf("gojek", "gopay"))
     )
 
     private lateinit var binding: ActivityMainBinding
@@ -31,16 +32,23 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         binding.editUrl.setText(Prefs.getWebAppUrl(this))
-        binding.editSecret.setText(Prefs.getSecretKey(this))
         refreshSelectedAppsLabel()
 
         binding.btnSave.setOnClickListener {
             Prefs.setWebAppUrl(this, binding.editUrl.text.toString().trim())
-            Prefs.setSecretKey(this, binding.editSecret.text.toString().trim())
             Toast.makeText(this, "Pengaturan disimpan", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnPickApps.setOnClickListener { showAppPicker() }
+
+        binding.btnOpenPanel.setOnClickListener {
+            val url = Prefs.getWebAppUrl(this)
+            if (url.isBlank()) {
+                Toast.makeText(this, "Isi & simpan URL Web App dulu", Toast.LENGTH_SHORT).show()
+            } else {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            }
+        }
 
         binding.btnNotifAccess.setOnClickListener {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
@@ -62,19 +70,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshSelectedAppsLabel() {
-        val selected = Prefs.getMonitoredPackages(this)
+        val selected = Prefs.getMonitoredMap(this)
         binding.textSelectedApps.text = if (selected.isEmpty()) {
             "Belum dipilih"
         } else {
-            selected.joinToString(", ") { pkg -> appLabelFor(pkg) }
+            selected.values.sorted().joinToString(", ")
         }
-    }
-
-    private fun appLabelFor(packageName: String): String = try {
-        val info = this.packageManager.getApplicationInfo(packageName, 0)
-        this.packageManager.getApplicationLabel(info).toString()
-    } catch (e: Exception) {
-        packageName
     }
 
     /** Cari paket aplikasi yang terpasang di HP yang label-nya cocok salah satu kata kunci target. */
@@ -90,14 +91,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun showAppPicker() {
         val resolvedPackages = targetApps.map { resolveInstalledPackage(it.keywords) }
-        val currentSelection = Prefs.getMonitoredPackages(this)
+        val currentMap = Prefs.getMonitoredMap(this)
 
         val labels = targetApps.mapIndexed { i, target ->
             if (resolvedPackages[i] != null) target.label else "${target.label} (tidak terpasang)"
         }.toTypedArray()
-        val checkedItems = resolvedPackages.map { it != null && currentSelection.contains(it) }.toBooleanArray()
+        val checkedItems = resolvedPackages.map { it != null && currentMap.containsKey(it) }.toBooleanArray()
 
-        val tempSelection = currentSelection.toMutableSet()
+        val tempSelection = currentMap.toMutableMap()
 
         val dialog = AlertDialog.Builder(this)
             .setTitle("Pilih aplikasi bank/e-wallet")
@@ -108,10 +109,10 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "${targetApps[which].label} tidak terpasang di HP ini", Toast.LENGTH_SHORT).show()
                     return@setMultiChoiceItems
                 }
-                if (isChecked) tempSelection.add(pkg) else tempSelection.remove(pkg)
+                if (isChecked) tempSelection[pkg] = targetApps[which].key else tempSelection.remove(pkg)
             }
             .setPositiveButton("Simpan") { _, _ ->
-                Prefs.setMonitoredPackages(this, tempSelection)
+                Prefs.setMonitoredMap(this, tempSelection)
                 refreshSelectedAppsLabel()
             }
             .setNegativeButton("Batal", null)

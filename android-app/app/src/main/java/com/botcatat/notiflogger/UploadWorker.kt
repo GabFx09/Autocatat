@@ -21,7 +21,7 @@ class UploadWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
 
     companion object {
         const val KEY_URL = "url"
-        const val KEY_SECRET = "secret"
+        const val KEY_CATEGORY = "category"
         const val KEY_APP_NAME = "app_name"
         const val KEY_APP_PACKAGE = "app_package"
         const val KEY_TITLE = "title"
@@ -41,7 +41,7 @@ class UploadWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
         val timestampMillis = inputData.getLong(KEY_TIMESTAMP, System.currentTimeMillis())
 
         val payload = JSONObject().apply {
-            put("secret", inputData.getString(KEY_SECRET) ?: "")
+            put("category", inputData.getString(KEY_CATEGORY) ?: "")
             put("timestamp", isoFormat.format(Date(timestampMillis)))
             put("appName", inputData.getString(KEY_APP_NAME) ?: "")
             put("appPackage", inputData.getString(KEY_APP_PACKAGE) ?: "")

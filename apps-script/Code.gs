@@ -1,35 +1,117 @@
 /**
- * Backend pencatat notifikasi bank/e-wallet ke Google Sheets.
+ * Backend pencatat notifikasi bank/e-wallet ke Google Sheets, dengan panel
+ * pengaturan supaya tiap aplikasi (BCA, BRI, Mandiri, BNI, DANA, OVO,
+ * LinkAja, GoPay) bisa dihubungkan ke Google Sheet & nama tab-nya
+ * masing-masing -- dan bisa diganti kapan saja tanpa mengubah apa pun di
+ * aplikasi Android.
+ *
+ * Struktur: BCA -> Sheet terhubung -> Tab terhubung, BRI -> Sheet terhubung
+ * -> Tab terhubung, dst -- semuanya diatur lewat panel ini.
  *
  * Cara pakai:
- * 1. Buat Google Sheet baru, buka Extensions > Apps Script, tempel kode ini.
- * 2. Jalankan fungsi `setup` sekali (Run > setup) untuk membuat header &
- *    menyimpan secret key. Ganti nilai MY_SECRET di bawah dulu sebelum run.
- * 3. Deploy > New deployment > pilih tipe "Web app".
+ * 1. Buka https://script.google.com, buat project baru (atau lewat
+ *    Extensions > Apps Script dari sebuah Google Sheet), tempel kode ini.
+ * 2. Deploy > New deployment > pilih tipe "Web app".
  *      - Execute as: Me
  *      - Who has access: Anyone
- * 4. Salin "Web app URL" hasil deploy, tempel ke aplikasi Android (kolom URL Web App).
- * 5. Isi secret key yang SAMA di aplikasi Android.
+ * 3. Salin "Web app URL" hasil deploy, tempel ke aplikasi Android (kolom
+ *    URL Web App). URL ini SELAMANYA tidak berubah -- cukup diisi sekali
+ *    di tiap HP.
+ * 4. Buka URL yang sama itu di browser (bukan dari app) -- akan muncul
+ *    Panel Pengaturan dengan 8 bagian (satu per bank/e-wallet). Isi link
+ *    Google Sheet & nama tab untuk masing-masing, klik Simpan Semua.
+ *
+ * Setiap kali kamu mau pindah/ganti Sheet tujuan salah satu bank/e-wallet,
+ * cukup buka lagi panel ini dan ubah linknya -- semua HP yang sudah
+ * terpasang otomatis ikut tanpa perlu disetel ulang.
  */
 
-var SHEET_NAME = 'Transaksi';
-var MY_SECRET = 'GANTI_DENGAN_KUNCI_RAHASIA_ANDA';
+var CATEGORIES = [
+  { key: 'BCA', label: 'BCA' },
+  { key: 'BRI', label: 'BRI' },
+  { key: 'MANDIRI', label: 'Mandiri' },
+  { key: 'BNI', label: 'BNI' },
+  { key: 'DANA', label: 'DANA' },
+  { key: 'OVO', label: 'OVO' },
+  { key: 'LINKAJA', label: 'LinkAja' },
+  { key: 'GOPAY', label: 'GoPay' }
+];
 
-function setup() {
-  PropertiesService.getScriptProperties().setProperty('SECRET', MY_SECRET);
+function doGet(e) {
+  var props = PropertiesService.getScriptProperties();
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
+  var hasAnyParam = CATEGORIES.some(function (c) {
+    return e.parameter['url_' + c.key] !== undefined;
+  });
+
+  if (hasAnyParam) {
+    CATEGORIES.forEach(function (c) {
+      var url = (e.parameter['url_' + c.key] || '').trim();
+      var sheetName = (e.parameter['sheet_' + c.key] || c.label).trim();
+      props.setProperty('SPREADSHEET_URL_' + c.key, url);
+      props.setProperty('SHEET_NAME_' + c.key, sheetName);
+    });
   }
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow([
-      'Waktu Diterima', 'Waktu Notifikasi', 'Aplikasi', 'Paket Aplikasi',
-      'Judul', 'Isi Notifikasi', 'Nominal', 'Jenis'
-    ]);
-    sheet.setFrozenRows(1);
-  }
+
+  return HtmlService
+    .createHtmlOutput(renderPanel_(props, hasAnyParam))
+    .setTitle('Panel NotifLogger')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function renderPanel_(props, justSaved) {
+  var notice = justSaved
+    ? '<p class="notice">Tersimpan. Semua HP otomatis memakai pengaturan baru ini.</p>'
+    : '';
+
+  var rows = CATEGORIES.map(function (c) {
+    var url = props.getProperty('SPREADSHEET_URL_' + c.key) || '';
+    var sheetName = props.getProperty('SHEET_NAME_' + c.key) || c.label;
+    return '<fieldset>' +
+      '<legend>' + c.label + '</legend>' +
+      '<label>Link Google Sheet terhubung</label>' +
+      '<input type="text" name="url_' + c.key + '" value="' + escapeHtml_(url) + '" ' +
+      'placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">' +
+      '<label>Nama Sheet/Tab terhubung</label>' +
+      '<input type="text" name="sheet_' + c.key + '" value="' + escapeHtml_(sheetName) + '" ' +
+      'placeholder="' + c.label + '">' +
+      '</fieldset>';
+  }).join('');
+
+  return '<!DOCTYPE html><html><head><style>' +
+    'body{font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:40px auto;padding:0 16px;color:#222}' +
+    'h2{margin-bottom:4px}' +
+    '.notice{background:#e8f5e9;color:#1b5e20;padding:10px 12px;border-radius:6px}' +
+    'fieldset{margin-top:16px;border:1px solid #ddd;border-radius:6px;padding:12px}' +
+    'legend{font-weight:bold;padding:0 6px}' +
+    'label{display:block;margin-top:10px;font-size:13px;font-weight:bold}' +
+    'input{width:100%;padding:8px;box-sizing:border-box;margin-top:4px;font-size:14px;' +
+    'border:1px solid #ccc;border-radius:4px}' +
+    'button{margin-top:24px;padding:12px 24px;background:#1b5e20;color:#fff;border:none;' +
+    'border-radius:4px;font-size:14px;cursor:pointer}' +
+    'small{color:#666}' +
+    '</style></head><body>' +
+    '<h2>Panel NotifLogger</h2>' +
+    '<small>Hubungkan tiap bank/e-wallet ke Google Sheet & tab tujuannya masing-masing.</small>' +
+    notice +
+    '<form method="get">' +
+    rows +
+    '<button type="submit">Simpan Semua</button>' +
+    '</form>' +
+    '</body></html>';
+}
+
+function escapeHtml_(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function extractSpreadsheetId_(url) {
+  var match = url.match(/[-\w]{25,}/);
+  return match ? match[0] : null;
 }
 
 function doPost(e) {
@@ -37,23 +119,39 @@ function doPost(e) {
 
   try {
     var body = JSON.parse(e.postData.contents);
-    var expectedSecret = PropertiesService.getScriptProperties().getProperty('SECRET');
+    var category = String(body.category || '').toUpperCase();
+    var props = PropertiesService.getScriptProperties();
 
-    if (!expectedSecret) {
-      result.message = 'Server belum di-setup. Jalankan fungsi setup() dulu.';
-      return jsonResponse(result);
+    var categoryDef = CATEGORIES.filter(function (c) { return c.key === category; })[0];
+    if (!categoryDef) {
+      result.message = 'Kategori aplikasi tidak dikenali: ' + category;
+      return jsonResponse_(result);
     }
 
-    if (body.secret !== expectedSecret) {
-      result.message = 'Secret key tidak cocok.';
-      return jsonResponse(result);
+    var spreadsheetUrl = props.getProperty('SPREADSHEET_URL_' + category);
+    var sheetName = props.getProperty('SHEET_NAME_' + category) || categoryDef.label;
+
+    if (!spreadsheetUrl) {
+      result.message = 'Belum ada Google Sheet untuk ' + categoryDef.label +
+        '. Buka URL Web App ini di browser untuk mengatur panel dulu.';
+      return jsonResponse_(result);
     }
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEET_NAME);
+    var id = extractSpreadsheetId_(spreadsheetUrl);
+    if (!id) {
+      result.message = 'Link Google Sheet untuk ' + categoryDef.label + ' tidak valid.';
+      return jsonResponse_(result);
+    }
+
+    var ss = SpreadsheetApp.openById(id);
+    var sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
-      result.message = 'Sheet "' + SHEET_NAME + '" tidak ditemukan. Jalankan setup() dulu.';
-      return jsonResponse(result);
+      sheet = ss.insertSheet(sheetName);
+      sheet.appendRow([
+        'Waktu Diterima', 'Waktu Notifikasi', 'Aplikasi', 'Paket Aplikasi',
+        'Judul', 'Isi Notifikasi', 'Nominal', 'Jenis'
+      ]);
+      sheet.setFrozenRows(1);
     }
 
     sheet.appendRow([
@@ -68,15 +166,15 @@ function doPost(e) {
     ]);
 
     result.status = 'ok';
-    result.message = 'Tercatat';
+    result.message = 'Tercatat ke ' + categoryDef.label;
   } catch (err) {
     result.message = err.toString();
   }
 
-  return jsonResponse(result);
+  return jsonResponse_(result);
 }
 
-function jsonResponse(obj) {
+function jsonResponse_(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);

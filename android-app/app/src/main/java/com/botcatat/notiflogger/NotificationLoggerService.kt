@@ -13,8 +13,8 @@ class NotificationLoggerService : NotificationListenerService() {
         super.onNotificationPosted(sbn)
 
         val packageName = sbn.packageName
-        val monitored = Prefs.getMonitoredPackages(applicationContext)
-        if (!monitored.contains(packageName)) return
+        val monitoredMap = Prefs.getMonitoredMap(applicationContext)
+        val category = monitoredMap[packageName] ?: return
 
         val extras = sbn.notification.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
@@ -33,12 +33,11 @@ class NotificationLoggerService : NotificationListenerService() {
         val parsed = TransactionParser.parse("$title $text")
 
         val url = Prefs.getWebAppUrl(applicationContext)
-        val secret = Prefs.getSecretKey(applicationContext)
         if (url.isBlank()) return // belum dikonfigurasi, jangan coba kirim
 
         val inputData = Data.Builder()
             .putString(UploadWorker.KEY_URL, url)
-            .putString(UploadWorker.KEY_SECRET, secret)
+            .putString(UploadWorker.KEY_CATEGORY, category)
             .putString(UploadWorker.KEY_APP_NAME, appName)
             .putString(UploadWorker.KEY_APP_PACKAGE, packageName)
             .putString(UploadWorker.KEY_TITLE, title)

@@ -1,19 +1,27 @@
 # NotifLogger — Catat Notifikasi Bank/E-wallet ke Google Sheets
 
-Aplikasi Android yang membaca notifikasi masuk dari aplikasi bank/e-wallet yang
-kamu pilih, lalu otomatis mengirim datanya (nominal, jenis transaksi, isi
-notifikasi) sebagai baris baru di Google Sheets.
+Aplikasi Android yang membaca notifikasi masuk dari 8 aplikasi bank/e-wallet
+(BCA, BRI, Mandiri, BNI, DANA, OVO, LinkAja, GoPay), lalu otomatis mengirim
+datanya (nominal, jenis transaksi, isi notifikasi) sebagai baris baru ke
+Google Sheets — **masing-masing bank/e-wallet bisa punya Google Sheet & tab
+tujuannya sendiri-sendiri**, diatur lewat satu Panel di browser.
 
 Arsitektur:
 
 ```
-[Notifikasi bank/e-wallet] --> [NotifLogger (Android)] --> HTTPS POST --> [Google Apps Script Web App] --> [Google Sheet]
+[Notifikasi bank/e-wallet] --> [NotifLogger (Android)] --> HTTPS POST --> [Google Apps Script Web App] --> [Google Sheet sesuai kategori]
+                                                                    ^
+                                                            [Panel pengaturan]
+                                                       (dibuka lewat browser,
+                                                        atur Sheet per bank)
 ```
 
-Kenapa lewat Apps Script, bukan Google Sheets API langsung dari HP? Karena
-kalau langsung, HP perlu login OAuth Google yang jauh lebih ribet diatur &
-di-refresh tokennya. Web App Apps Script cukup dipanggil dengan URL + secret
-key, dan tetap aman karena hanya bisa diakses lewat URL rahasia itu.
+Aplikasi Android hanya perlu tahu **satu URL Web App yang tidak pernah
+berubah** (diisi sekali di tiap HP). Ke Google Sheet mana data tiap
+bank/e-wallet dicatat diatur belakangan lewat **Panel** — dibuka dengan URL
+yang sama itu di browser. Jadi kalau kamu ganti/pindah spreadsheet tujuan,
+cukup ubah di Panel — semua HP yang sudah terpasang otomatis ikut, tidak
+perlu update aplikasi maupun setting ulang di HP manapun.
 
 ## Download APK tanpa Android Studio
 
@@ -33,61 +41,68 @@ di tiap HP.
 ## Struktur folder
 
 - `android-app/` — project Android Studio (Kotlin)
-- `apps-script/Code.gs` — kode backend Google Apps Script
+- `apps-script/Code.gs` — kode backend Google Apps Script + Panel
 
 ## 1. Deploy backend Google Apps Script (lakukan ini duluan)
 
-1. Buka https://sheets.google.com, buat Spreadsheet baru, beri nama misalnya
-   "Catatan Transaksi".
-2. Di menu Sheet: **Extensions > Apps Script**.
-3. Hapus isi default `Code.gs`, lalu tempel isi file `apps-script/Code.gs`
+1. Buka https://script.google.com, klik **New project** (atau lewat
+   Extensions > Apps Script dari sebuah Google Sheet mana pun).
+2. Hapus isi default `Code.gs`, lalu tempel isi file `apps-script/Code.gs`
    dari project ini.
-4. Ganti baris berikut dengan kunci rahasiamu sendiri (bebas, contoh string
-   acak yang panjang):
-   ```js
-   var MY_SECRET = 'GANTI_DENGAN_KUNCI_RAHASIA_ANDA';
-   ```
-5. Di toolbar Apps Script, pilih fungsi `setup` dari dropdown, lalu klik
-   **Run**. Saat diminta izin, klik **Review permissions** → pilih akun
-   Google-mu → **Allow**. Ini akan membuat sheet "Transaksi" dengan header
-   kolom dan menyimpan secret key di server.
-6. Klik **Deploy > New deployment**.
+3. Klik **Deploy > New deployment**.
    - Klik ikon gear, pilih tipe **Web app**.
    - Execute as: **Me**
    - Who has access: **Anyone**
-   - Klik **Deploy**, izinkan akses lagi bila diminta.
-7. Salin **Web app URL** yang muncul (formatnya
-   `https://script.google.com/macros/s/xxxxx/exec`). URL ini yang nanti
-   dimasukkan ke aplikasi Android.
+   - Klik **Deploy**, izinkan akses (Review permissions → pilih akun
+     Google-mu → Allow) bila diminta.
+4. Salin **Web app URL** yang muncul (formatnya
+   `https://script.google.com/macros/s/xxxxx/exec`). URL ini **selamanya
+   tidak berubah** walau kamu ganti-ganti spreadsheet tujuan — inilah yang
+   nanti dimasukkan ke aplikasi Android.
 
-> Catatan: setiap kali kamu mengubah `Code.gs`, kamu perlu **Deploy > Manage
-> deployments > edit (pensil) > Version: New version > Deploy** agar
-> perubahan aktif di URL yang sama.
+> Catatan: setiap kali kamu mengubah isi `Code.gs` di kemudian hari, perlu
+> **Deploy > Manage deployments > edit (pensil) > Version: New version >
+> Deploy** agar perubahan aktif di URL yang sama.
 
-## 2. Build & install aplikasi Android
+## 2. Atur Panel — hubungkan tiap bank/e-wallet ke Google Sheet-nya
 
-Butuh **Android Studio** (mesin ini tidak punya Android SDK, jadi build harus
-dilakukan di komputer/laptop yang sudah terpasang Android Studio).
+1. Buka URL Web App dari langkah 1.4 di atas **langsung di browser** (bukan
+   dari aplikasi Android) — akan muncul halaman **Panel NotifLogger** dengan
+   8 bagian: BCA, BRI, Mandiri, BNI, DANA, OVO, LinkAja, GoPay.
+2. Untuk tiap bank/e-wallet yang mau dicatat, isi:
+   - **Link Google Sheet terhubung** — link Google Sheet tujuan (boleh sama
+     untuk semua, boleh beda-beda per bank)
+   - **Nama Sheet/Tab terhubung** — nama tab di dalam Sheet itu (kalau
+     belum ada, akan dibuat otomatis beserta header kolomnya saat data
+     pertama masuk)
+3. Klik **Simpan Semua**.
+
+Kapan pun kamu mau pindah Sheet tujuan salah satu bank (atau semuanya),
+tinggal buka lagi Panel ini dan ubah — tidak perlu sentuh aplikasi Android
+maupun HP sama sekali.
+
+## 3. Build & install aplikasi Android
+
+Butuh **Android Studio**.
 
 1. Buka Android Studio → **Open** → pilih folder `android-app/`.
-2. Tunggu Gradle sync selesai (Android Studio akan otomatis mengunduh Gradle
-   wrapper & dependency yang dibutuhkan; jika muncul prompt "Gradle wrapper
-   file is missing", klik OK untuk membiarkan Android Studio membuatkannya).
+2. Tunggu Gradle sync selesai.
 3. Sambungkan HP Android via USB (aktifkan **USB debugging** di Developer
    Options), atau pakai emulator.
 4. Klik **Run ▶** untuk install aplikasi ke HP.
 
-Kalau tidak punya Android Studio dan hanya ingin APK jadi, beri tahu saya —
-saya bisa bantu siapkan build lewat GitHub Actions/cloud CI karena mesin ini
-sendiri tidak bisa mem-build APK (tidak ada Android SDK terpasang).
+Atau tanpa Android Studio sama sekali, lihat bagian **Download APK tanpa
+Android Studio** di atas.
 
-## 3. Konfigurasi aplikasi di HP
+## 4. Konfigurasi aplikasi di HP
 
 Setelah aplikasi NotifLogger terpasang dan dibuka:
 
-1. **URL Web App** — tempel URL dari langkah 1.7 di atas.
-2. **Secret Key** — isi persis sama dengan `MY_SECRET` di `Code.gs`.
-3. Klik **Simpan Pengaturan**.
+1. **URL Web App** — tempel URL dari langkah 1.4. Isi ini **cukup sekali**,
+   tidak perlu diubah lagi walau nanti ganti-ganti Sheet tujuan.
+2. Klik **Simpan Pengaturan**.
+3. (Opsional) Klik **Buka Panel (Atur Sheet Tujuan)** untuk langsung buka
+   Panel di browser HP kalau belum diatur di langkah 2 sebelumnya.
 4. Klik **Pilih Aplikasi**, centang yang mau dipantau. Daftarnya dibatasi
    hanya 8: **BCA, BRI, Mandiri, BNI, DANA, OVO, LinkAja, GoPay**. Aplikasi
    yang tidak terpasang di HP akan ditandai "(tidak terpasang)" dan tidak
@@ -97,21 +112,23 @@ Setelah aplikasi NotifLogger terpasang dan dibuka:
    notifikasi apa pun.
 6. Kembali ke aplikasi, pastikan status menunjukkan "akses notifikasi AKTIF".
 
-Setelah itu, setiap kali ada notifikasi masuk dari aplikasi yang kamu pilih,
-NotifLogger otomatis mengirimkannya ke Google Sheets — baris baru berisi
+Setelah itu, setiap kali ada notifikasi masuk dari salah satu dari 8 aplikasi
+yang kamu pilih, NotifLogger otomatis mengirimkannya ke Google Sheet yang
+sudah dihubungkan untuk bank/e-wallet itu di Panel — baris baru berisi
 waktu, nama aplikasi, judul & isi notifikasi, nominal (jika terdeteksi), dan
 jenis transaksi (Masuk/Keluar, best-effort dari kata kunci).
 
 ## Catatan keamanan & keterbatasan
 
+- **Tidak ada secret key** — siapa pun yang tahu URL Web App bisa mengirim
+  data palsu ke Panel/Sheet-mu. Risikonya kecil karena URL Apps Script
+  sendiri sudah berupa string acak panjang yang praktis tidak bisa ditebak,
+  tapi tetap jangan disebarluaskan/dipublikasikan URL-nya.
 - **Izin akses notifikasi bersifat luas** — begitu diaktifkan, Android
   memberi aplikasi akses baca ke SEMUA notifikasi di HP. NotifLogger hanya
-  memproses & mengirim notifikasi dari paket aplikasi yang kamu centang di
-  langkah 3.4, tapi izin OS-nya sendiri tidak bisa dibatasi per-app oleh
+  memproses & mengirim notifikasi dari salah satu dari 8 aplikasi yang kamu
+  centang, tapi izin OS-nya sendiri tidak bisa dibatasi per-app oleh
   aplikasi pihak ketiga manapun.
-- **URL + secret key Apps Script setara password** — jangan dibagikan ke
-  orang lain, karena siapa pun yang punya keduanya bisa menulis baris palsu
-  ke sheet-mu.
 - **Parsing nominal & jenis transaksi berbasis kata kunci**, bukan parser
   resmi dari bank, jadi bisa meleset untuk format notifikasi yang tidak
   terduga. Judul & isi notifikasi asli tetap disimpan apa adanya di kolom
