@@ -32,11 +32,9 @@ class NotificationLoggerService : NotificationListenerService() {
 
         val parsed = TransactionParser.parse("$title $text")
 
-        val url = Prefs.getWebAppUrl(applicationContext)
-        if (url.isBlank()) return // belum dikonfigurasi, jangan coba kirim
+        if (!Config.WEB_APP_URL.startsWith("https://")) return // belum di-build dengan URL yang valid
 
         val inputData = Data.Builder()
-            .putString(UploadWorker.KEY_URL, url)
             .putString(UploadWorker.KEY_CATEGORY, category)
             .putString(UploadWorker.KEY_APP_NAME, appName)
             .putString(UploadWorker.KEY_APP_PACKAGE, packageName)

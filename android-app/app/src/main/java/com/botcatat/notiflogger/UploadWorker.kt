@@ -20,7 +20,6 @@ import java.util.TimeZone
 class UploadWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
 
     companion object {
-        const val KEY_URL = "url"
         const val KEY_CATEGORY = "category"
         const val KEY_APP_NAME = "app_name"
         const val KEY_APP_PACKAGE = "app_package"
@@ -33,8 +32,6 @@ class UploadWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
     }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
-        val urlString = inputData.getString(KEY_URL) ?: return@withContext Result.failure()
-
         val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).apply {
             timeZone = TimeZone.getDefault()
         }
@@ -53,7 +50,7 @@ class UploadWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
 
         var connection: HttpURLConnection? = null
         try {
-            val url = URL(urlString)
+            val url = URL(Config.WEB_APP_URL)
             connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 doOutput = true

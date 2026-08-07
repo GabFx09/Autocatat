@@ -4,20 +4,13 @@ import android.content.Context
 import android.content.SharedPreferences
 import org.json.JSONObject
 
-/** Wrapper kecil untuk menyimpan pengaturan: URL Apps Script dan peta aplikasi->kategori yang dipantau. */
+/** Wrapper kecil untuk menyimpan peta aplikasi->kategori bank/e-wallet yang dipantau. */
 object Prefs {
     private const val FILE = "notiflogger_prefs"
-    private const val KEY_URL = "webapp_url"
     private const val KEY_MONITORED_MAP = "monitored_map"
 
     private fun sp(context: Context): SharedPreferences =
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-
-    fun getWebAppUrl(context: Context): String = sp(context).getString(KEY_URL, "") ?: ""
-
-    fun setWebAppUrl(context: Context, url: String) {
-        sp(context).edit().putString(KEY_URL, url).apply()
-    }
 
     /** Peta packageName aplikasi terpasang -> kode kategori bank/e-wallet (mis. "BCA"). */
     fun getMonitoredMap(context: Context): Map<String, String> {

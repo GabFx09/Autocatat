@@ -7,11 +7,20 @@ import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.botcatat.notiflogger.databinding.ActivityMainBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : AppCompatActivity() {
 
     private data class TargetApp(val label: String, val key: String, val keywords: List<String>)
+
+    private data class ConnectionInfo(val docName: String, val sheetName: String, val connected: Boolean)
 
     private val targetApps = listOf(
         TargetApp("BCA", "BCA", listOf("bca")),
@@ -31,22 +40,15 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.editUrl.setText(Prefs.getWebAppUrl(this))
         refreshSelectedAppsLabel()
-
-        binding.btnSave.setOnClickListener {
-            Prefs.setWebAppUrl(this, binding.editUrl.text.toString().trim())
-            Toast.makeText(this, "Pengaturan disimpan", Toast.LENGTH_SHORT).show()
-        }
 
         binding.btnPickApps.setOnClickListener { showAppPicker() }
 
         binding.btnOpenPanel.setOnClickListener {
-            val url = Prefs.getWebAppUrl(this)
-            if (url.isBlank()) {
-                Toast.makeText(this, "Isi & simpan URL Web App dulu", Toast.LENGTH_SHORT).show()
+            if (!Config.WEB_APP_URL.startsWith("https://")) {
+                Toast.makeText(this, "Aplikasi belum di-build dengan URL panel yang valid", Toast.LENGTH_SHORT).show()
             } else {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Config.WEB_APP_URL)))
             }
         }
 
@@ -89,12 +91,53 @@ class MainActivity : AppCompatActivity() {
             ?.packageName
     }
 
+    private fun fetchConnectionStatus(): Map<String, ConnectionInfo> {
+        if (!Config.WEB_APP_URL.startsWith("https://")) return emptyMap()
+        return try {
+            val url = URL("${Config.WEB_APP_URL}?format=json")
+            val connection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 10000
+                readTimeout = 10000
+            }
+            val text = connection.inputStream.bufferedReader().use { it.readText() }
+            connection.disconnect()
+            val json = JSONObject(text)
+            targetApps.associate { target ->
+                val obj = json.optJSONObject(target.key)
+                target.key to ConnectionInfo(
+                    docName = obj?.optString("docName").orEmpty(),
+                    sheetName = obj?.optString("sheetName").orEmpty(),
+                    connected = obj?.optBoolean("connected") ?: false
+                )
+            }
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
     private fun showAppPicker() {
+        binding.btnPickApps.isEnabled = false
+        lifecycleScope.launch {
+            val status = withContext(Dispatchers.IO) { fetchConnectionStatus() }
+            binding.btnPickApps.isEnabled = true
+            showAppPickerDialog(status)
+        }
+    }
+
+    private fun showAppPickerDialog(status: Map<String, ConnectionInfo>) {
         val resolvedPackages = targetApps.map { resolveInstalledPackage(it.keywords) }
         val currentMap = Prefs.getMonitoredMap(this)
 
         val labels = targetApps.mapIndexed { i, target ->
-            if (resolvedPackages[i] != null) target.label else "${target.label} (tidak terpasang)"
+            val info = status[target.key]
+            val sheetPart = if (info != null && info.connected) {
+                " — ${info.docName} > ${info.sheetName}"
+            } else {
+                " — (belum terhubung)"
+            }
+            val installedPart = if (resolvedPackages[i] == null) " (tidak terpasang)" else ""
+            "${target.label}$sheetPart$installedPart"
         }.toTypedArray()
         val checkedItems = resolvedPackages.map { it != null && currentMap.containsKey(it) }.toBooleanArray()
 

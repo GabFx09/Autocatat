@@ -14,9 +14,9 @@
  * 2. Deploy > New deployment > pilih tipe "Web app".
  *      - Execute as: Me
  *      - Who has access: Anyone
- * 3. Salin "Web app URL" hasil deploy, tempel ke aplikasi Android (kolom
- *    URL Web App). URL ini SELAMANYA tidak berubah -- cukup diisi sekali
- *    di tiap HP.
+ * 3. Salin "Web app URL" hasil deploy. URL ini ditanam langsung di source
+ *    code aplikasi Android (lihat Config.kt) saat di-build -- pengguna app
+ *    tidak pernah perlu mengisi URL apa pun.
  * 4. Buka URL yang sama itu di browser (bukan dari app) -- akan muncul
  *    Panel Pengaturan dengan 8 bagian (satu per bank/e-wallet). Isi link
  *    Google Sheet & nama tab untuk masing-masing, klik Simpan Semua.
@@ -40,6 +40,10 @@ var CATEGORIES = [
 function doGet(e) {
   var props = PropertiesService.getScriptProperties();
 
+  if (e.parameter.format === 'json') {
+    return jsonResponse_(buildStatus_(props));
+  }
+
   var hasAnyParam = CATEGORIES.some(function (c) {
     return e.parameter['url_' + c.key] !== undefined;
   });
@@ -57,6 +61,31 @@ function doGet(e) {
     .createHtmlOutput(renderPanel_(props, hasAnyParam))
     .setTitle('Panel NotifLogger')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/** Status koneksi tiap kategori untuk ditampilkan di aplikasi Android (read-only). */
+function buildStatus_(props) {
+  var status = {};
+  CATEGORIES.forEach(function (c) {
+    var url = props.getProperty('SPREADSHEET_URL_' + c.key) || '';
+    var sheetName = props.getProperty('SHEET_NAME_' + c.key) || c.label;
+    var id = url ? extractSpreadsheetId_(url) : null;
+    var docName = '';
+    var connected = false;
+
+    if (id) {
+      try {
+        docName = SpreadsheetApp.openById(id).getName();
+        connected = true;
+      } catch (err) {
+        docName = '';
+        connected = false;
+      }
+    }
+
+    status[c.key] = { docName: docName, sheetName: sheetName, connected: connected };
+  });
+  return status;
 }
 
 function renderPanel_(props, justSaved) {

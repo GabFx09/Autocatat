@@ -20,37 +20,9 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="1. URL Web App (Google Apps Script)"
+            android:text="1. Pilih Aplikasi yang Dipantau"
             android:textStyle="bold"
             android:layout_marginTop="8dp" />
-
-        <EditText
-            android:id="@+id/edit_url"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="https://script.google.com/macros/s/xxx/exec"
-            android:inputType="textUri" />
-
-        <Button
-            android:id="@+id/btn_save"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Simpan Pengaturan"
-            android:layout_marginTop="12dp" />
-
-        <Button
-            android:id="@+id/btn_open_panel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Buka Panel (Atur Sheet Tujuan)"
-            android:layout_marginTop="8dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="2. Pilih Aplikasi yang Dipantau"
-            android:textStyle="bold"
-            android:layout_marginTop="24dp" />
 
         <TextView
             android:id="@+id/text_selected_apps"
@@ -66,10 +38,17 @@
             android:text="Pilih Aplikasi"
             android:layout_marginTop="8dp" />
 
+        <Button
+            android:id="@+id/btn_open_panel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Buka Panel (Atur Sheet Tujuan)"
+            android:layout_marginTop="8dp" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="3. Izinkan Akses Notifikasi"
+            android:text="2. Izinkan Akses Notifikasi"
             android:textStyle="bold"
             android:layout_marginTop="24dp" />
 

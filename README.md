@@ -4,24 +4,26 @@ Aplikasi Android yang membaca notifikasi masuk dari 8 aplikasi bank/e-wallet
 (BCA, BRI, Mandiri, BNI, DANA, OVO, LinkAja, GoPay), lalu otomatis mengirim
 datanya (nominal, jenis transaksi, isi notifikasi) sebagai baris baru ke
 Google Sheets — **masing-masing bank/e-wallet bisa punya Google Sheet & tab
-tujuannya sendiri-sendiri**, diatur lewat satu Panel di browser.
+tujuannya sendiri-sendiri**, diatur lewat satu Panel admin di browser
+komputer.
 
 Arsitektur:
 
 ```
 [Notifikasi bank/e-wallet] --> [NotifLogger (Android)] --> HTTPS POST --> [Google Apps Script Web App] --> [Google Sheet sesuai kategori]
                                                                     ^
-                                                            [Panel pengaturan]
-                                                       (dibuka lewat browser,
-                                                        atur Sheet per bank)
+                                                          [Panel admin di komputer]
+                                                       (buka URL Web App di browser,
+                                                        atur Sheet & tab per bank)
 ```
 
-Aplikasi Android hanya perlu tahu **satu URL Web App yang tidak pernah
-berubah** (diisi sekali di tiap HP). Ke Google Sheet mana data tiap
-bank/e-wallet dicatat diatur belakangan lewat **Panel** — dibuka dengan URL
-yang sama itu di browser. Jadi kalau kamu ganti/pindah spreadsheet tujuan,
-cukup ubah di Panel — semua HP yang sudah terpasang otomatis ikut, tidak
-perlu update aplikasi maupun setting ulang di HP manapun.
+URL Web App **ditanam langsung di source code aplikasi** (`Config.kt`) saat
+build — pengguna aplikasi di HP tidak pernah perlu mengisi atau melihat URL
+apa pun. Ke Google Sheet & tab mana data tiap bank/e-wallet dicatat diatur
+sepenuhnya dari Panel admin (dibuka lewat browser komputer dengan URL yang
+sama). Jadi kalau kamu ganti/pindah spreadsheet tujuan, cukup ubah di Panel
+— semua HP yang sudah terpasang otomatis ikut, tanpa update aplikasi maupun
+setting apa pun di HP.
 
 ## Download APK tanpa Android Studio
 
@@ -41,7 +43,8 @@ di tiap HP.
 ## Struktur folder
 
 - `android-app/` — project Android Studio (Kotlin)
-- `apps-script/Code.gs` — kode backend Google Apps Script + Panel
+  - `Config.kt` — berisi URL Web App yang ditanam saat build
+- `apps-script/Code.gs` — kode backend Google Apps Script + Panel admin
 
 ## 1. Deploy backend Google Apps Script (lakukan ini duluan)
 
@@ -52,23 +55,27 @@ di tiap HP.
 3. Klik **Deploy > New deployment**.
    - Klik ikon gear, pilih tipe **Web app**.
    - Execute as: **Me**
-   - Who has access: **Anyone**
+   - Who has access: **Anyone** (bukan "Anyone with Google account" — kalau
+     salah pilih ini, aplikasi akan diminta login Google dan gagal)
    - Klik **Deploy**, izinkan akses (Review permissions → pilih akun
      Google-mu → Allow) bila diminta.
 4. Salin **Web app URL** yang muncul (formatnya
    `https://script.google.com/macros/s/xxxxx/exec`). URL ini **selamanya
-   tidak berubah** walau kamu ganti-ganti spreadsheet tujuan — inilah yang
-   nanti dimasukkan ke aplikasi Android.
+   tidak berubah** walau kamu ganti-ganti spreadsheet tujuan.
+5. Tempel URL itu ke `android-app/app/src/main/java/com/botcatat/notiflogger/Config.kt`,
+   ganti nilai `WEB_APP_URL`, lalu commit & push — GitHub Actions akan
+   otomatis build ulang APK dengan URL itu tertanam di dalamnya.
 
 > Catatan: setiap kali kamu mengubah isi `Code.gs` di kemudian hari, perlu
 > **Deploy > Manage deployments > edit (pensil) > Version: New version >
-> Deploy** agar perubahan aktif di URL yang sama.
+> Deploy** agar perubahan aktif di URL yang sama (tidak perlu ubah
+> `Config.kt` lagi kalau URL-nya tidak berubah).
 
-## 2. Atur Panel — hubungkan tiap bank/e-wallet ke Google Sheet-nya
+## 2. Atur Panel admin — hubungkan tiap bank/e-wallet ke Google Sheet-nya
 
-1. Buka URL Web App dari langkah 1.4 di atas **langsung di browser** (bukan
-   dari aplikasi Android) — akan muncul halaman **Panel NotifLogger** dengan
-   8 bagian: BCA, BRI, Mandiri, BNI, DANA, OVO, LinkAja, GoPay.
+1. Buka URL Web App dari langkah 1.4 di atas **langsung di browser komputer**
+   (bukan dari aplikasi Android) — akan muncul halaman **Panel NotifLogger**
+   dengan 8 bagian: BCA, BRI, Mandiri, BNI, DANA, OVO, LinkAja, GoPay.
 2. Untuk tiap bank/e-wallet yang mau dicatat, isi:
    - **Link Google Sheet terhubung** — link Google Sheet tujuan (boleh sama
      untuk semua, boleh beda-beda per bank)
@@ -78,8 +85,8 @@ di tiap HP.
 3. Klik **Simpan Semua**.
 
 Kapan pun kamu mau pindah Sheet tujuan salah satu bank (atau semuanya),
-tinggal buka lagi Panel ini dan ubah — tidak perlu sentuh aplikasi Android
-maupun HP sama sekali.
+tinggal buka lagi Panel ini dari komputer dan ubah — tidak perlu sentuh
+aplikasi Android maupun HP sama sekali.
 
 ## 3. Build & install aplikasi Android
 
@@ -96,21 +103,24 @@ Android Studio** di atas.
 
 ## 4. Konfigurasi aplikasi di HP
 
-Setelah aplikasi NotifLogger terpasang dan dibuka:
+Setelah aplikasi NotifLogger terpasang dan dibuka — tidak ada URL yang perlu
+diisi sama sekali:
 
-1. **URL Web App** — tempel URL dari langkah 1.4. Isi ini **cukup sekali**,
-   tidak perlu diubah lagi walau nanti ganti-ganti Sheet tujuan.
-2. Klik **Simpan Pengaturan**.
-3. (Opsional) Klik **Buka Panel (Atur Sheet Tujuan)** untuk langsung buka
-   Panel di browser HP kalau belum diatur di langkah 2 sebelumnya.
-4. Klik **Pilih Aplikasi**, centang yang mau dipantau. Daftarnya dibatasi
-   hanya 8: **BCA, BRI, Mandiri, BNI, DANA, OVO, LinkAja, GoPay**. Aplikasi
-   yang tidak terpasang di HP akan ditandai "(tidak terpasang)" dan tidak
-   bisa dicentang.
-5. Klik **Buka Pengaturan Akses Notifikasi**, cari "NotifLogger" di daftar,
+1. Klik **Pilih Aplikasi**. Aplikasi akan mengambil status koneksi terbaru
+   dari server, lalu menampilkan 8 pilihan (BCA, BRI, Mandiri, BNI, DANA,
+   OVO, LinkAja, GoPay) beserta nama Google Sheet & tab yang sedang
+   terhubung untuk masing-masing (atau "(belum terhubung)" kalau belum
+   diatur di Panel). Aplikasi yang tidak terpasang di HP ditandai "(tidak
+   terpasang)" dan tidak bisa dicentang.
+2. Centang yang mau dipantau, klik **Simpan**.
+3. Klik **Buka Pengaturan Akses Notifikasi**, cari "NotifLogger" di daftar,
    lalu aktifkan. Ini wajib — tanpa izin ini aplikasi tidak bisa membaca
    notifikasi apa pun.
-6. Kembali ke aplikasi, pastikan status menunjukkan "akses notifikasi AKTIF".
+4. Kembali ke aplikasi, pastikan status menunjukkan "akses notifikasi AKTIF".
+
+(Ada juga tombol **"Buka Panel (Atur Sheet Tujuan)"** di aplikasi sebagai
+jalan pintas membuka Panel admin di browser HP, tapi mengatur Sheet tujuan
+lebih nyaman dilakukan dari komputer seperti langkah 2 di atas.)
 
 Setelah itu, setiap kali ada notifikasi masuk dari salah satu dari 8 aplikasi
 yang kamu pilih, NotifLogger otomatis mengirimkannya ke Google Sheet yang
@@ -120,10 +130,15 @@ jenis transaksi (Masuk/Keluar, best-effort dari kata kunci).
 
 ## Catatan keamanan & keterbatasan
 
-- **Tidak ada secret key** — siapa pun yang tahu URL Web App bisa mengirim
-  data palsu ke Panel/Sheet-mu. Risikonya kecil karena URL Apps Script
-  sendiri sudah berupa string acak panjang yang praktis tidak bisa ditebak,
-  tapi tetap jangan disebarluaskan/dipublikasikan URL-nya.
+- **Repo ini Public dan tidak ada secret key** — URL Web App tertanam di
+  source code (`Config.kt`) yang bisa dilihat siapa saja, dan juga bisa
+  diekstrak dari APK yang didownload publik. Konsekuensinya: siapa pun yang
+  menemukan URL ini secara teknis bisa mengirim baris data palsu ke
+  Sheet-mu, dan endpoint status (`?format=json`) membocorkan judul dokumen
+  Google Sheet yang terhubung per bank (bukan isi datanya). Ini trade-off
+  yang disengaja demi kemudahan (tidak perlu isi apa pun di app) — kalau
+  suatu saat mau menutup celah ini, opsinya adalah membuat repo Private
+  kembali (konsekuensi: download APK dari Releases perlu login GitHub).
 - **Izin akses notifikasi bersifat luas** — begitu diaktifkan, Android
   memberi aplikasi akses baca ke SEMUA notifikasi di HP. NotifLogger hanya
   memproses & mengirim notifikasi dari salah satu dari 8 aplikasi yang kamu
