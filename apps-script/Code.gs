@@ -432,14 +432,24 @@ function jsonResponse_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+/** Cek apakah sheet ini sedang terhubung sebagai tujuan salah satu dari 8 kategori. */
+function isConfiguredSheet_(spreadsheetId, sheetName) {
+  var props = PropertiesService.getScriptProperties();
+  return CATEGORIES.some(function (c) {
+    return props.getProperty('SPREADSHEET_ID_' + c.key) === spreadsheetId &&
+      props.getProperty('SHEET_NAME_' + c.key) === sheetName;
+  });
+}
+
 /**
- * Auto-timestamp Jam Catat & Jam Kasih untuk sheet operasional "TEST 1",
- * dipicu saat manusia mengedit sel secara langsung di UI Sheets (bukan
- * saat doPost menulis baris dari notifikasi HP -- appendRow/setValues dari
- * script tidak pernah memicu onEdit).
+ * Auto-timestamp Jam Catat & Jam Kasih, berlaku untuk Sheet manapun yang
+ * sedang terhubung ke salah satu dari 8 kategori (BCA/BRI/Mandiri/dst) lewat
+ * Panel -- bukan dikunci ke satu nama sheet tertentu. Dipicu saat manusia
+ * mengedit sel secara langsung di UI Sheets (bukan saat doPost menulis baris
+ * dari notifikasi HP -- appendRow/setValues dari script tidak pernah memicu
+ * onEdit).
  *
- * Kolom di sheet "TEST 1": C=Jam Catat, D=Jam Kasih, E=User ID,
- * F=Nama Rek Bank, G=Credit.
+ * Kolom: C=Jam Catat, D=Jam Kasih, E=User ID, F=Nama Rek Bank, G=Credit.
  * - Kalau F (Nama Rek Bank) dan G (Credit) sudah terisi -> C (Jam Catat)
  *   otomatis diisi jam sekarang.
  * - Kalau E (User ID) sudah terisi -> D (Jam Kasih) otomatis diisi jam
@@ -450,7 +460,8 @@ function jsonResponse_(obj) {
  */
 function onEdit(e) {
   var sheet = e.range.getSheet();
-  if (sheet.getName() !== 'TEST 1') return;
+  var spreadsheetId = sheet.getParent().getId();
+  if (!isConfiguredSheet_(spreadsheetId, sheet.getName())) return;
 
   var row = e.range.getRow();
   if (row === 1) return;
