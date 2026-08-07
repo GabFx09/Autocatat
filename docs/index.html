@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel NotifLogger</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:40px auto;padding:0 16px;color:#222;background:#fafafa}
+  h2{margin-bottom:4px}
+  .notice{background:#e8f5e9;color:#1b5e20;padding:10px 12px;border-radius:6px}
+  .error{background:#fdecea;color:#b00020;padding:10px 12px;border-radius:6px}
+  fieldset{margin-top:16px;border:1px solid #ddd;border-radius:6px;padding:12px;background:#fff}
+  legend{font-weight:bold;padding:0 6px}
+  label{display:block;margin-top:10px;font-size:13px;font-weight:bold}
+  select,input[type=text]{width:100%;padding:8px;box-sizing:border-box;margin-top:4px;font-size:14px;
+    border:1px solid #ccc;border-radius:4px;background:#fff}
+  button{margin-top:16px;padding:12px 24px;background:#1b5e20;color:#fff;border:none;
+    border-radius:4px;font-size:14px;cursor:pointer}
+  .remove-btn{margin-top:0;padding:4px 10px;font-size:12px;background:#B00020}
+  ul{list-style:none;padding:0;margin-top:8px}
+  ul li{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee}
+  small{color:#666}
+  #configForm{margin-top:16px}
+</style>
+</head>
+<body>
+  <h2>Panel NotifLogger</h2>
+  <small>Hubungkan tiap bank/e-wallet ke Spreadsheet &amp; Sheet tujuannya masing-masing.</small>
+  <div id="notice"></div>
+
+  <fieldset>
+    <legend>Daftar Spreadsheet yang boleh dipilih</legend>
+    <label>Tambah dari link Google Sheet</label>
+    <input type="text" id="newSpreadsheetUrl" placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">
+    <button type="button" id="addSpreadsheetBtn">Tambah</button>
+    <ul id="allowedList"></ul>
+  </fieldset>
+
+  <form id="configForm"></form>
+  <button type="submit" form="configForm" id="saveBtn">Simpan Semua</button>
+
+<script>
+// Ganti ke URL Web App Apps Script kamu kalau berbeda dari yang sudah ditanam di aplikasi Android.
+var API_URL = "https://script.google.com/macros/s/AKfycbwmaD_puo3nZPzU5sfC84raKvut2bEkJSXviUO-PVyXY4g02fJ-7gBrRy2VFU6MOUN7mA/exec";
+
+var CATEGORIES = [
+  { key: "BCA", label: "BCA" },
+  { key: "BRI", label: "BRI" },
+  { key: "MANDIRI", label: "Mandiri" },
+  { key: "BNI", label: "BNI" },
+  { key: "DANA", label: "DANA" },
+  { key: "OVO", label: "OVO" },
+  { key: "LINKAJA", label: "LinkAja" },
+  { key: "GOPAY", label: "GoPay" }
+];
+
+var spreadsheets = [];
+var status = {};
+
+function showNotice(message, isError) {
+  document.getElementById("notice").innerHTML =
+    '<p class="' + (isError ? "error" : "notice") + '">' + message + "</p>";
+}
+
+function apiGet(query) {
+  return fetch(API_URL + query).then(function (r) { return r.json(); });
+}
+
+function apiPost(payload) {
+  return fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(payload)
+  }).then(function (r) { return r.json(); });
+}
+
+function renderAllowedList() {
+  var ul = document.getElementById("allowedList");
+  ul.innerHTML = spreadsheets.map(function (s) {
+    return '<li>' + s.name + ' <button type="button" class="remove-btn" data-id="' + s.id + '">Hapus</button></li>';
+  }).join("");
+
+  ul.querySelectorAll(".remove-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      apiPost({ action: "remove_spreadsheet", spreadsheetId: btn.getAttribute("data-id") })
+        .then(function (res) {
+          spreadsheets = res.spreadsheets || [];
+          renderAllowedList();
+          renderCategoryCards();
+          showNotice(res.message, false);
+        });
+    });
+  });
+}
+
+function spreadsheetOptionsHtml(selectedId) {
+  var options = ['<option value="">-- Pilih Spreadsheet --</option>'];
+  spreadsheets.forEach(function (s) {
+    options.push('<option value="' + s.id + '"' + (s.id === selectedId ? " selected" : "") + '>' + s.name + "</option>");
+  });
+  return options.join("");
+}
+
+function loadSheetsInto(selectEl, spreadsheetId, selectedSheet) {
+  if (!spreadsheetId) {
+    selectEl.innerHTML = '<option value="">-- Pilih Sheet --</option>';
+    return;
+  }
+  selectEl.innerHTML = '<option value="">Memuat...</option>';
+  apiGet("?format=json&action=list_sheets&spreadsheetId=" + encodeURIComponent(spreadsheetId))
+    .then(function (names) {
+      var options = ['<option value="">-- Pilih Sheet --</option>'];
+      names.forEach(function (n) {
+        options.push('<option value="' + n + '"' + (n === selectedSheet ? " selected" : "") + '>' + n + "</option>");
+      });
+      selectEl.innerHTML = options.join("");
+    });
+}
+
+function renderCategoryCards() {
+  var form = document.getElementById("configForm");
+  form.innerHTML = CATEGORIES.map(function (c) {
+    return '<fieldset>' +
+      "<legend>" + c.label + "</legend>" +
+      "<label>Spreadsheet</label>" +
+      '<select class="ss-select" data-key="' + c.key + '">' + spreadsheetOptionsHtml("") + "</select>" +
+      "<label>Sheet/Tab</label>" +
+      '<select class="sheet-select" data-key="' + c.key + '"><option value="">-- Pilih Sheet --</option></select>' +
+      "</fieldset>";
+  }).join("");
+
+  CATEGORIES.forEach(function (c) {
+    var ssSelect = form.querySelector('.ss-select[data-key="' + c.key + '"]');
+    var sheetSelect = form.querySelector('.sheet-select[data-key="' + c.key + '"]');
+    var current = status[c.key];
+
+    if (current && current.spreadsheetId) {
+      ssSelect.value = current.spreadsheetId;
+      loadSheetsInto(sheetSelect, current.spreadsheetId, current.sheetName);
+    }
+
+    ssSelect.addEventListener("change", function () {
+      loadSheetsInto(sheetSelect, ssSelect.value, "");
+    });
+  });
+}
+
+document.getElementById("addSpreadsheetBtn").addEventListener("click", function () {
+  var url = document.getElementById("newSpreadsheetUrl").value.trim();
+  if (!url) return;
+  apiPost({ action: "add_spreadsheet", url: url }).then(function (res) {
+    showNotice(res.message, res.status !== "ok");
+    if (res.status === "ok") {
+      spreadsheets = res.spreadsheets || [];
+      document.getElementById("newSpreadsheetUrl").value = "";
+      renderAllowedList();
+      renderCategoryCards();
+    }
+  });
+});
+
+document.getElementById("configForm").addEventListener("submit", function (ev) {
+  ev.preventDefault();
+  var configs = {};
+  document.querySelectorAll(".ss-select").forEach(function (sel) {
+    var key = sel.getAttribute("data-key");
+    var sheetSel = document.querySelector('.sheet-select[data-key="' + key + '"]');
+    configs[key] = { spreadsheetId: sel.value, sheetName: sheetSel.value };
+  });
+  apiPost({ action: "save_config", configs: configs }).then(function (res) {
+    showNotice(res.message, res.status !== "ok");
+  });
+});
+
+Promise.all([
+  apiGet("?format=json&action=list_spreadsheets"),
+  apiGet("?format=json")
+]).then(function (results) {
+  spreadsheets = results[0];
+  status = results[1];
+  renderAllowedList();
+  renderCategoryCards();
+}).catch(function () {
+  showNotice("Gagal menghubungi backend. Cek koneksi internet atau URL API di script halaman ini.", true);
+});
+</script>
+</body>
+</html>

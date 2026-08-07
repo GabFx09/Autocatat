@@ -4,26 +4,31 @@ Aplikasi Android yang membaca notifikasi masuk dari 8 aplikasi bank/e-wallet
 (BCA, BRI, Mandiri, BNI, DANA, OVO, LinkAja, GoPay), lalu otomatis mengirim
 datanya (nominal, jenis transaksi, isi notifikasi) sebagai baris baru ke
 Google Sheets — **masing-masing bank/e-wallet bisa punya Google Sheet & tab
-tujuannya sendiri-sendiri**, diatur lewat satu Panel admin di browser
-komputer.
+tujuannya sendiri-sendiri**, diatur lewat Panel admin di
+**https://gabfx09.github.io/Autocatat/**.
 
 Arsitektur:
 
 ```
 [Notifikasi bank/e-wallet] --> [NotifLogger (Android)] --> HTTPS POST --> [Google Apps Script Web App] --> [Google Sheet sesuai kategori]
                                                                     ^
-                                                          [Panel admin di komputer]
-                                                       (buka URL Web App di browser,
-                                                        atur Sheet & tab per bank)
+                                                          [Panel admin (GitHub Pages)]
+                                                     (halaman statis yang memanggil
+                                                      Web App yang sama lewat fetch,
+                                                      atur Sheet & tab per bank)
 ```
 
-URL Web App **ditanam langsung di source code aplikasi** (`Config.kt`) saat
-build — pengguna aplikasi di HP tidak pernah perlu mengisi atau melihat URL
-apa pun. Ke Google Sheet & tab mana data tiap bank/e-wallet dicatat diatur
-sepenuhnya dari Panel admin (dibuka lewat browser komputer dengan URL yang
-sama). Jadi kalau kamu ganti/pindah spreadsheet tujuan, cukup ubah di Panel
-— semua HP yang sudah terpasang otomatis ikut, tanpa update aplikasi maupun
-setting apa pun di HP.
+URL Web App Apps Script **ditanam langsung di source code aplikasi**
+(`Config.kt`) saat build — pengguna aplikasi di HP tidak pernah perlu
+mengisi atau melihat URL apa pun. Ke Google Sheet & tab mana data tiap
+bank/e-wallet dicatat diatur sepenuhnya dari Panel admin. Jadi kalau kamu
+ganti/pindah spreadsheet tujuan, cukup ubah di Panel — semua HP yang sudah
+terpasang otomatis ikut, tanpa update aplikasi maupun setting apa pun di HP.
+
+Panel admin di-hosting sebagai halaman statis di **GitHub Pages**
+(`docs/index.html`) supaya linknya rapi (bukan link `script.google.com`
+yang panjang) — tapi tetap memanggil backend Apps Script yang sama di
+belakang layar lewat `fetch()` untuk semua operasi baca/tulis data.
 
 ## Download APK tanpa Android Studio
 
@@ -70,23 +75,27 @@ di tiap HP.
 > **Deploy > Manage deployments > edit (pensil) > Version: New version >
 > Deploy** agar perubahan aktif di URL yang sama (tidak perlu ubah
 > `Config.kt` lagi kalau URL-nya tidak berubah).
->
-> Catatan izin: backend sekarang membaca daftar Spreadsheet dari Google
-> Drive-mu untuk ditampilkan sebagai dropdown, jadi saat deploy/redeploy
-> Google mungkin minta izin akses Drive yang lebih luas — klik **Allow**
-> seperti biasa.
+
+Kalau kamu deploy ulang dengan URL Web App yang **berbeda** dari yang sudah
+ada, jangan lupa update juga `API_URL` di `docs/index.html` (bukan cuma
+`Config.kt` di app Android).
 
 ## 2. Atur Panel admin — hubungkan tiap bank/e-wallet ke Spreadsheet & Sheet-nya
 
-Panel ini bisa dibuka dari **browser komputer** (via URL Web App langsung)
-maupun dari **aplikasi Android** (tombol "Pilih Aplikasi") — keduanya
-memakai dropdown yang sama, tidak perlu paste link sama sekali.
+Buka **https://gabfx09.github.io/Autocatat/** di browser komputer (atau
+lewat tombol "Buka Panel" di aplikasi Android). Halaman ini sudah otomatis
+aktif lewat GitHub Pages (folder `docs/`).
 
-1. Buka URL Web App dari langkah 1.4 di atas **di browser komputer** — akan
-   muncul halaman **Panel NotifLogger** dengan 8 bagian: BCA, BRI, Mandiri,
-   BNI, DANA, OVO, LinkAja, GoPay.
+1. **Daftarkan Spreadsheet dulu** — supaya tidak semua Google Sheet di
+   Drive-mu terekspos ke dropdown, kamu perlu menambahkan secara manual
+   Spreadsheet mana saja yang boleh dipilih:
+   - Paste link Google Sheet ke kotak **"Tambah dari link Google Sheet"**
+   - Klik **Tambah** — Spreadsheet itu akan muncul di daftar & jadi opsi
+     di semua dropdown "Spreadsheet" di bawahnya
+   - Ulangi untuk tiap Spreadsheet yang mau dipakai. Klik **Hapus** di
+     samping nama untuk mencabutnya dari daftar kapan saja.
 2. Untuk tiap bank/e-wallet yang mau dicatat, pilih dari dropdown:
-   - **Spreadsheet** — daftar semua Google Sheet yang ada di Drive akun ini
+   - **Spreadsheet** — dari daftar yang sudah kamu daftarkan di langkah 1
    - **Sheet/Tab** — daftar tab di dalam Spreadsheet yang baru dipilih
      (muncul otomatis setelah Spreadsheet dipilih; kalau tabnya belum ada,
      akan dibuat otomatis beserta header kolom saat data pertama masuk)
@@ -155,16 +164,16 @@ kata kunci di isi notifikasi).
 ## Catatan keamanan & keterbatasan
 
 - **Repo ini Public dan tidak ada secret key** — URL Web App tertanam di
-  source code (`Config.kt`) yang bisa dilihat siapa saja, dan juga bisa
-  diekstrak dari APK yang didownload publik. Konsekuensinya: siapa pun yang
-  menemukan URL ini secara teknis bisa mengirim baris data palsu ke
-  Sheet-mu, dan endpoint `?format=json&action=list_spreadsheets` membocorkan
-  **nama semua Google Sheet yang ada di Drive akun ini** (bukan isi
-  datanya) supaya bisa ditampilkan sebagai dropdown. Kalau nama-nama
-  dokumen Google Drive-mu ada yang sensitif, pertimbangkan untuk membuat
-  repo Private (konsekuensi: download APK dari Releases perlu login GitHub)
-  — ini trade-off yang disengaja demi kemudahan (tidak perlu isi/paste apa
-  pun secara manual).
+  source code (`Config.kt` dan `docs/index.html`) yang bisa dilihat siapa
+  saja, dan juga bisa diekstrak dari APK yang didownload publik.
+  Konsekuensinya: siapa pun yang menemukan URL Web App ini secara teknis
+  bisa mengirim baris data palsu ke Sheet-mu, atau mengubah daftar
+  Spreadsheet/Sheet tujuan lewat Panel. Endpoint
+  `?format=json&action=list_spreadsheets` **hanya membocorkan nama
+  Spreadsheet yang sudah kamu daftarkan sendiri lewat allowlist di Panel**
+  (bukan lagi seluruh isi Drive-mu seperti versi sebelumnya). Kalau ini
+  masih dirasa kurang aman, opsinya adalah membuat repo Private
+  (konsekuensi: download APK dari Releases perlu login GitHub).
 - **Izin akses notifikasi bersifat luas** — begitu diaktifkan, Android
   memberi aplikasi akses baca ke SEMUA notifikasi di HP. NotifLogger hanya
   memproses & mengirim notifikasi dari salah satu dari 8 aplikasi yang kamu

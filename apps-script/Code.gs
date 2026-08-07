@@ -18,13 +18,12 @@
  * 3. Salin "Web app URL" hasil deploy. URL ini ditanam langsung di source
  *    code aplikasi Android (lihat Config.kt) saat di-build -- pengguna app
  *    tidak pernah perlu mengisi URL apa pun.
- * 4. Buka URL yang sama itu di browser (Panel admin), atau lewat tombol
- *    "Pilih Aplikasi" di aplikasi Android -- pilih Spreadsheet & Sheet
- *    tujuan tiap bank/e-wallet dari dropdown.
- *
- * Catatan izin: karena sekarang membaca daftar Spreadsheet dari Google
- * Drive-mu (DriveApp), saat pertama kali deploy/otorisasi ulang Google akan
- * minta izin akses Drive yang lebih luas -- klik Allow seperti biasa.
+ * 4. Buka URL yang sama itu di browser (Panel admin), tambahkan Spreadsheet
+ *    yang boleh dipilih lewat kotak "Tambah dari link Google Sheet" (cuma
+ *    Spreadsheet yang kamu tambahkan di sini yang akan muncul di dropdown --
+ *    bukan otomatis seluruh isi Drive-mu), lalu pilih Spreadsheet & Sheet
+ *    tujuan tiap bank/e-wallet dari dropdown, baik lewat Panel ini maupun
+ *    lewat tombol "Pilih Aplikasi" di aplikasi Android.
  */
 
 var CATEGORIES = [
@@ -64,20 +63,72 @@ function doPost(e) {
   if (body.action === 'save_config') {
     return saveConfig_(body.configs || {});
   }
+  if (body.action === 'add_spreadsheet') {
+    return jsonResponse_(addAllowedSpreadsheet_(body.url || ''));
+  }
+  if (body.action === 'remove_spreadsheet') {
+    return jsonResponse_(removeAllowedSpreadsheet_(body.spreadsheetId || ''));
+  }
 
   return logTransaction_(body);
 }
 
-/** Daftar semua Google Sheet yang ada di Drive akun ini, untuk dropdown. */
-function listSpreadsheets_() {
-  var files = DriveApp.getFilesByType(MimeType.GOOGLE_SHEETS);
-  var result = [];
-  while (files.hasNext() && result.length < 300) {
-    var f = files.next();
-    result.push({ id: f.getId(), name: f.getName() });
+/**
+ * Spreadsheet yang boleh muncul di dropdown -- daftar putih yang dikelola
+ * manual lewat Panel (bukan otomatis dari seluruh Drive), supaya nama
+ * dokumen lain di Drive-mu tidak ikut terekspos ke siapa pun yang tahu
+ * URL Web App ini.
+ */
+function getAllowedSpreadsheets_() {
+  var raw = PropertiesService.getScriptProperties().getProperty('ALLOWED_SPREADSHEETS');
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    return [];
   }
-  result.sort(function (a, b) { return a.name.localeCompare(b.name); });
-  return result;
+}
+
+function saveAllowedSpreadsheets_(list) {
+  PropertiesService.getScriptProperties().setProperty('ALLOWED_SPREADSHEETS', JSON.stringify(list));
+}
+
+function extractSpreadsheetId_(url) {
+  var match = String(url).match(/[-\w]{25,}/);
+  return match ? match[0] : null;
+}
+
+function addAllowedSpreadsheet_(url) {
+  var id = extractSpreadsheetId_(url);
+  if (!id) {
+    return { status: 'error', message: 'Link Google Sheet tidak valid' };
+  }
+
+  var name;
+  try {
+    name = SpreadsheetApp.openById(id).getName();
+  } catch (err) {
+    return { status: 'error', message: 'Tidak bisa membuka Spreadsheet ini: ' + err };
+  }
+
+  var list = getAllowedSpreadsheets_();
+  if (!list.some(function (s) { return s.id === id; })) {
+    list.push({ id: id, name: name });
+    saveAllowedSpreadsheets_(list);
+  }
+
+  return { status: 'ok', message: 'Ditambahkan: ' + name, spreadsheets: listSpreadsheets_() };
+}
+
+function removeAllowedSpreadsheet_(id) {
+  var list = getAllowedSpreadsheets_().filter(function (s) { return s.id !== id; });
+  saveAllowedSpreadsheets_(list);
+  return { status: 'ok', message: 'Dihapus', spreadsheets: listSpreadsheets_() };
+}
+
+/** Daftar Spreadsheet yang sudah di-allow-list, untuk dropdown. */
+function listSpreadsheets_() {
+  return getAllowedSpreadsheets_().sort(function (a, b) { return a.name.localeCompare(b.name); });
 }
 
 /** Nama-nama tab/sheet di dalam satu Spreadsheet, untuk dropdown. */
@@ -251,6 +302,11 @@ function renderPanel_() {
       '</fieldset>';
   }).join('');
 
+  var allowedRows = spreadsheets.map(function (s) {
+    return '<li>' + escapeHtml_(s.name) +
+      ' <button type="button" class="remove-btn" data-id="' + s.id + '">Hapus</button></li>';
+  }).join('');
+
   return '<!DOCTYPE html><html><head><style>' +
     'body{font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:40px auto;padding:0 16px;color:#222}' +
     'h2{margin-bottom:4px}' +
@@ -258,19 +314,33 @@ function renderPanel_() {
     'fieldset{margin-top:16px;border:1px solid #ddd;border-radius:6px;padding:12px}' +
     'legend{font-weight:bold;padding:0 6px}' +
     'label{display:block;margin-top:10px;font-size:13px;font-weight:bold}' +
-    'select{width:100%;padding:8px;box-sizing:border-box;margin-top:4px;font-size:14px;' +
+    'select,input[type=text]{width:100%;padding:8px;box-sizing:border-box;margin-top:4px;font-size:14px;' +
     'border:1px solid #ccc;border-radius:4px;background:#fff}' +
     'button{margin-top:24px;padding:12px 24px;background:#1b5e20;color:#fff;border:none;' +
     'border-radius:4px;font-size:14px;cursor:pointer}' +
+    '.remove-btn{margin-top:0;padding:4px 10px;font-size:12px;background:#B00020}' +
+    'ul{list-style:none;padding:0;margin-top:8px}' +
+    'ul li{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee}' +
     'small{color:#666}' +
     '</style></head><body>' +
     '<h2>Panel NotifLogger</h2>' +
     '<small>Hubungkan tiap bank/e-wallet ke Spreadsheet & Sheet tujuannya masing-masing.</small>' +
     '<div id="notice"></div>' +
+    '<fieldset>' +
+    '<legend>Daftar Spreadsheet yang boleh dipilih</legend>' +
+    '<label>Tambah dari link Google Sheet</label>' +
+    '<input type="text" id="newSpreadsheetUrl" placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">' +
+    '<button type="button" id="addSpreadsheetBtn">Tambah</button>' +
+    '<ul id="allowedList">' + allowedRows + '</ul>' +
+    '</fieldset>' +
     '<form id="panelForm">' + rows + '<button type="submit">Simpan Semua</button></form>' +
     '<script>' +
     'var SELF_URL = ' + JSON.stringify(selfUrl) + ';' +
     'var INITIAL = ' + JSON.stringify(initialData) + ';' +
+    'function postAction(payload) {' +
+    '  return fetch(SELF_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(payload) })' +
+    '    .then(function(r){ return r.json(); });' +
+    '}' +
     'function loadSheets(key, spreadsheetId, selectedSheet) {' +
     '  var sheetSelect = document.querySelector(".sheet-select[data-key=\\"" + key + "\\"]");' +
     '  if (!spreadsheetId) { sheetSelect.innerHTML = "<option value=\\"\\">-- Pilih Sheet --</option>"; return; }' +
@@ -299,9 +369,23 @@ function renderPanel_() {
     '    var sheetSel = document.querySelector(".sheet-select[data-key=\\"" + key + "\\"]");' +
     '    configs[key] = { spreadsheetId: sel.value, sheetName: sheetSel.value };' +
     '  });' +
-    '  fetch(SELF_URL, { method: "POST", body: JSON.stringify({ action: "save_config", configs: configs }) })' +
-    '    .then(function(r){ return r.json(); })' +
+    '  postAction({ action: "save_config", configs: configs })' +
     '    .then(function(res){ document.getElementById("notice").innerHTML = "<p class=\\"notice\\">" + res.message + "</p>"; });' +
+    '});' +
+    'document.getElementById("addSpreadsheetBtn").addEventListener("click", function(){' +
+    '  var url = document.getElementById("newSpreadsheetUrl").value.trim();' +
+    '  if (!url) return;' +
+    '  postAction({ action: "add_spreadsheet", url: url }).then(function(res){' +
+    '    document.getElementById("notice").innerHTML = "<p class=\\"notice\\">" + res.message + "</p>";' +
+    '    if (res.status === "ok") location.reload();' +
+    '  });' +
+    '});' +
+    'document.querySelectorAll(".remove-btn").forEach(function(btn){' +
+    '  btn.addEventListener("click", function(){' +
+    '    postAction({ action: "remove_spreadsheet", spreadsheetId: btn.getAttribute("data-id") }).then(function(){' +
+    '      location.reload();' +
+    '    });' +
+    '  });' +
     '});' +
     '</script>' +
     '</body></html>';
