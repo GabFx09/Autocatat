@@ -197,6 +197,25 @@ function ambilAngka_(rp) {
 }
 
 /**
+ * Ambil bagian "keterangan" dari notifikasi, mis. dari:
+ * "...KET.:ATMLTRPRM B9527 000547856 52920100897450"
+ * jadi "ATMLTRPRM B9527 000547856" (nomor rekening panjang di akhir dibuang).
+ * Kalau pola "KET" tidak ditemukan, pakai teks aslinya apa adanya.
+ */
+function parseKeterangan_(text) {
+  if (!text) return '';
+  var str = String(text);
+
+  var withoutTrailingAccountNumber = str.match(/KET[.:]+\s*(.+?)\s+\d{10,}\s*$/i);
+  if (withoutTrailingAccountNumber) return withoutTrailingAccountNumber[1].trim();
+
+  var simple = str.match(/KET[.:]+\s*(.+)$/i);
+  if (simple) return simple[1].trim();
+
+  return str;
+}
+
+/**
  * Baris terakhir yang benar-benar berisi data di kolom A. Dipakai alih-alih
  * sheet.getLastRow() biasa karena sheet dengan format/formula bawaan (mis.
  * template kas) bisa membuat getLastRow() mengira ratusan baris kosong di
@@ -240,29 +259,34 @@ function logTransaction_(body) {
     var sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
-      sheet.appendRow(['Tanggal', 'Kode', 'Waktu Notifikasi', 'Waktu Diterima', 'Judul', 'Isi Notifikasi', 'Nominal']);
+      sheet.appendRow([
+        'Tanggal', 'Kode', 'Jam Catat', 'Jam Kasih', 'User ID',
+        'Nama Rek Bank', 'Credit', 'Saldo Bank', 'Debit'
+      ]);
       sheet.setFrozenRows(1);
     }
 
     var now = new Date();
     var waktuNotifikasi = body.timestamp ? new Date(body.timestamp) : now;
     var targetRow = lastRowInColumnA_(sheet) + 1;
-
-    sheet.getRange(targetRow, 1, 1, 7).setValues([[
-      Utilities.formatDate(waktuNotifikasi, TIMEZONE, 'dd/MM/yyyy'),
-      categoryDef.key,
-      Utilities.formatDate(waktuNotifikasi, TIMEZONE, 'HH:mm:ss'),
-      Utilities.formatDate(now, TIMEZONE, 'HH:mm:ss'),
-      body.title || '',
-      body.text || '',
-      ambilAngka_(body.amount)
-    ]]);
-
+    var namaRekBank = parseKeterangan_(body.text);
+    var nominal = ambilAngka_(body.amount);
     var jenis = String(body.type || '').toLowerCase();
-    if (jenis === 'masuk') {
-      sheet.getRange(targetRow, 5, 1, 3).setBackground(WARNA_MASUK);
-    } else if (jenis === 'keluar') {
-      sheet.getRange(targetRow, 5, 1, 3).setBackground(WARNA_KELUAR);
+
+    // Kolom C (Jam Catat), D (Jam Kasih), E (User ID) sengaja tidak ditulis --
+    // User ID dikosongkan untuk transaksi otomatis, Jam Catat/Jam Kasih
+    // biar tetap diisi manual lewat onEdit seperti alur kerja yang sudah ada.
+    sheet.getRange(targetRow, 1).setValue(Utilities.formatDate(waktuNotifikasi, TIMEZONE, 'dd/MM/yyyy'));
+    sheet.getRange(targetRow, 2).setValue(categoryDef.key);
+    sheet.getRange(targetRow, 6).setValue(namaRekBank);
+
+    if (jenis === 'keluar') {
+      sheet.getRange(targetRow, 9).setValue(nominal);
+      sheet.getRange(targetRow, 6).setBackground(WARNA_KELUAR);
+      sheet.getRange(targetRow, 9).setBackground(WARNA_KELUAR);
+    } else {
+      sheet.getRange(targetRow, 7).setValue(nominal);
+      sheet.getRange(targetRow, 6, 1, 2).setBackground(WARNA_MASUK);
     }
 
     result.status = 'ok';
