@@ -320,3 +320,38 @@ function jsonResponse_(obj) {
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+/**
+ * Auto-timestamp Jam Catat & Jam Kasih untuk sheet operasional "TEST 1",
+ * dipicu saat manusia mengedit sel secara langsung di UI Sheets (bukan
+ * saat doPost menulis baris dari notifikasi HP -- appendRow/setValues dari
+ * script tidak pernah memicu onEdit).
+ *
+ * Kolom di sheet "TEST 1": C=Jam Catat, D=Jam Kasih, E=User ID,
+ * F=Nama Rek Bank, G=Credit.
+ * - Kalau F (Nama Rek Bank) dan G (Credit) sudah terisi -> C (Jam Catat)
+ *   otomatis diisi jam sekarang.
+ * - Kalau E (User ID) sudah terisi -> D (Jam Kasih) otomatis diisi jam
+ *   sekarang. Kalau E belum terisi, D TIDAK diisi otomatis.
+ */
+function onEdit(e) {
+  var sheet = e.range.getSheet();
+  if (sheet.getName() !== 'TEST 1') return;
+
+  var row = e.range.getRow();
+  if (row === 1) return;
+
+  var rowValues = sheet.getRange(row, 5, 1, 3).getValues()[0];
+  var userId = rowValues[0];
+  var namaRekBank = rowValues[1];
+  var credit = rowValues[2];
+  var waktu = Utilities.formatDate(new Date(), TIMEZONE, 'HH:mm:ss');
+
+  if (namaRekBank && credit) {
+    sheet.getRange(row, 3).setValue(waktu);
+  }
+
+  if (userId) {
+    sheet.getRange(row, 4).setValue(waktu);
+  }
+}
