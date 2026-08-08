@@ -21,10 +21,11 @@ WEB_APP_URL = (
 )
 CATEGORY = "KAHURIPAN86"
 
-# Nama tab persis seperti di Google Sheets (case-sensitive) -- "Sheet3" bukan
-# "SHEET3", supaya cocok dengan getSheetByName di backend.
-SHEET_OPTIONS = ["TEST 1", "TEST 2", "Sheet3"]
-DEFAULT_SHEET = "TEST 2"
+# Nama tab persis seperti di Google Sheets (case-sensitive), supaya cocok
+# dengan getSheetByName di backend. TEST 1/TEST 2/Sheet3 sudah di-rename jadi
+# tab per-bank ini (2026-08-09).
+SHEET_OPTIONS = ["BCA", "BRI", "MANDIRI", "BNI", "DANA", "OVO", "LINKAJA", "GOPAY"]
+DEFAULT_SHEET = "BRI"
 
 # Label channel yang muncul sebagai penanda blok "channel / nama / no HP" di
 # clipboard. Nama pengirim yang diambil adalah baris tepat SETELAH channel
