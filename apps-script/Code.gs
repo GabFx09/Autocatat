@@ -43,6 +43,9 @@ function doGet(e) {
   if (e.parameter.format === 'json') {
     if (action === 'list_spreadsheets') return jsonResponse_(listSpreadsheets_());
     if (action === 'list_sheets') return jsonResponse_(listSheetNames_(e.parameter.spreadsheetId || ''));
+    if (action === 'inspect_sheet') {
+      return jsonResponse_(inspectSheet_(e.parameter.spreadsheetId || '', e.parameter.sheetName || ''));
+    }
     return jsonResponse_(buildStatus_());
   }
 
@@ -141,6 +144,44 @@ function listSheetNames_(spreadsheetId) {
   } catch (err) {
     return [];
   }
+}
+
+/**
+ * Diagnostik read-only: intip nilai, formula, dan merge cell di baris paling
+ * atas dan di sekitar baris tempat lastRowInColumnA_ akan menulis --
+ * dipakai untuk memahami struktur template sebelum mengubah logika
+ * penulisan baris, tanpa mengubah data apa pun.
+ */
+function inspectSheet_(spreadsheetId, sheetName) {
+  if (!spreadsheetId || !sheetName) {
+    return { error: 'spreadsheetId dan sheetName wajib diisi' };
+  }
+
+  var ss = SpreadsheetApp.openById(spreadsheetId);
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return { error: 'Sheet tidak ditemukan' };
+
+  var numCols = Math.max(sheet.getLastColumn(), 12);
+  var boundaryRow = lastRowInColumnA_(sheet) + 1;
+
+  function snapshot(startRow, count) {
+    startRow = Math.max(1, startRow);
+    var range = sheet.getRange(startRow, 1, count, numCols);
+    return {
+      startRow: startRow,
+      values: range.getValues(),
+      formulas: range.getFormulas(),
+      merges: range.getMergedRanges().map(function (r) { return r.getA1Notation(); })
+    };
+  }
+
+  return {
+    numCols: numCols,
+    lastRow: sheet.getLastRow(),
+    boundaryRow: boundaryRow,
+    top: snapshot(1, 6),
+    aroundBoundary: snapshot(boundaryRow - 5, 10)
+  };
 }
 
 /** Status koneksi tiap kategori (Spreadsheet & Sheet yang sedang aktif). */
