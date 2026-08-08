@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'sequential-fill-04';
+var SCRIPT_VERSION = 'first-empty-row-05';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -265,7 +265,9 @@ function parseKeterangan_(text) {
  * Baris terakhir yang benar-benar berisi data di kolom A. Dipakai alih-alih
  * sheet.getLastRow() biasa karena sheet dengan format/formula bawaan (mis.
  * template kas) bisa membuat getLastRow() mengira ratusan baris kosong di
- * bawahnya "terpakai", sehingga data baru nyasar jauh ke bawah.
+ * bawahnya "terpakai", sehingga data baru nyasar jauh ke bawah. Sekarang
+ * cuma dipakai untuk diagnostik (inspect_sheet) -- penulisan data asli
+ * pakai firstEmptyRowFrom_ (lihat di bawah).
  */
 function lastRowInColumnA_(sheet) {
   var lastRow = sheet.getLastRow();
@@ -277,6 +279,26 @@ function lastRowInColumnA_(sheet) {
     }
   }
   return 0;
+}
+
+/**
+ * Baris kosong PERTAMA di kolom A mulai dari startRow. Beda dengan
+ * lastRowInColumnA_ (yang mencari baris terisi terakhir di seluruh sheet),
+ * fungsi ini kebal terhadap baris "nyasar" jauh di bawah -- kalau ada celah
+ * kosong di atas baris nyasar itu, celah itu yang dipakai duluan. Ini yang
+ * membuat transaksi baru terisi berurutan dari dekat baris atas (bukan
+ * loncat ke bawah baris terisi terakhir).
+ */
+function firstEmptyRowFrom_(sheet, startRow) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < startRow) return startRow;
+  var values = sheet.getRange(startRow, 1, lastRow - startRow + 1, 1).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (values[i][0] === '' || values[i][0] === null) {
+      return startRow + i;
+    }
+  }
+  return lastRow + 1;
 }
 
 function logTransaction_(body) {
@@ -330,7 +352,7 @@ function logTransaction_(body) {
     // yang sudah ada apa adanya -- urutannya otomatis kronologis (transaksi
     // pertama di atas, berikutnya di bawahnya), tanpa perlu menyusun ulang
     // formula sama sekali.
-    var targetRow = wasJustCreated ? 2 : (lastRowInColumnA_(sheet) + 1);
+    var targetRow = wasJustCreated ? 2 : firstEmptyRowFrom_(sheet, 4);
     var namaRekBank = parseKeterangan_(body.text);
     var nominal = ambilAngka_(body.amount);
 
