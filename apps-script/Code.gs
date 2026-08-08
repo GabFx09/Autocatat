@@ -26,6 +26,11 @@
  *    lewat tombol "Pilih Aplikasi" di aplikasi Android.
  */
 
+// Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
+// (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
+// yang terbaru, bukan versi lama yang ke-cache.
+var SCRIPT_VERSION = 'row4-insert-01';
+
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
   { key: 'BRI', label: 'BRI' },
@@ -212,6 +217,7 @@ function buildStatus_() {
     };
   });
 
+  status._version = SCRIPT_VERSION;
   return status;
 }
 
