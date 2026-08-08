@@ -97,7 +97,7 @@ def send_to_sheet(user_id, name, amount):
 class App:
     def __init__(self, root):
         self.root = root
-        root.title("Bot AutoPaste - KAHURIPAN86")
+        root.title("Bot AutoPaste")
         root.attributes("-topmost", True)
         root.resizable(False, False)
         root.configure(bg="#1b1b1b")
@@ -106,7 +106,7 @@ class App:
         status_font = tkfont.Font(family="Segoe UI", size=10)
 
         tk.Label(
-            root, text="Bot AutoPaste → KAHURIPAN86",
+            root, text="Bot AutoPaste",
             font=title_font, bg="#1b1b1b", fg="#f2c14e", pady=10,
         ).pack(fill="x", padx=16)
 
