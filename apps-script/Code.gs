@@ -304,6 +304,7 @@ function logTransaction_(body) {
 
     var ss = SpreadsheetApp.openById(spreadsheetId);
     var sheet = ss.getSheetByName(sheetName);
+    var wasJustCreated = false;
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
       sheet.appendRow([
@@ -311,11 +312,17 @@ function logTransaction_(body) {
         'Nama Rek Bank', 'Credit', 'Saldo Bank', 'Debit'
       ]);
       sheet.setFrozenRows(1);
+      wasJustCreated = true;
     }
 
     var now = new Date();
     var waktuNotifikasi = body.timestamp ? new Date(body.timestamp) : now;
-    var targetRow = lastRowInColumnA_(sheet) + 1;
+    // Baris 1 = header, baris 2-3 = banner/saldo-awal yang di-merge (template
+    // kas bawaan), baris 4 dst = transaksi dengan formula relatif ke baris di
+    // atasnya. Sisip di baris 4 (bukan 2) supaya transaksi terbaru tetap di
+    // atas tanpa menyentuh merge cell di baris 2-3.
+    var targetRow = wasJustCreated ? 2 : 4;
+    sheet.insertRowBefore(targetRow);
     var namaRekBank = parseKeterangan_(body.text);
     var nominal = ambilAngka_(body.amount);
 
