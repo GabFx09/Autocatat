@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'manual-sheet-override-09';
+var SCRIPT_VERSION = 'skip-banner-merge-10';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -318,6 +318,34 @@ function firstEmptyRowFrom_(sheet, startRow) {
   return lastRow + 1;
 }
 
+/**
+ * Beberapa sheet (mis. hasil duplikat tab operasional asli) punya banner
+ * cell gabungan (merge) di baris atas -- bukan baris 4 kosong seperti
+ * template kas standar. Menulis ke sel yang jadi bagian dari merge (selain
+ * pojok kiri-atasnya) diam-diam tidak tersimpan (tidak error, tapi juga
+ * tidak ada perubahan), jadi minRow harus dilompati sampai lewat merge
+ * vertikal terakhir dulu sebelum firstEmptyRowFrom_ mulai mencari baris
+ * kosong. Merge satu baris (mis. header per-kolom di baris 2 pada template
+ * standar) tidak masalah, hanya merge yang membentang lebih dari satu baris
+ * yang perlu dilompati.
+ */
+function firstUsableRowFrom_(sheet, minRow) {
+  var candidate = minRow;
+  for (var guard = 0; guard < 50; guard++) {
+    var merges = sheet.getRange(candidate, 1, 1, sheet.getMaxColumns()).getMergedRanges();
+    var pastMergeRow = candidate;
+    merges.forEach(function (m) {
+      var mergeEnd = m.getRow() + m.getNumRows() - 1;
+      if (m.getNumRows() > 1 && mergeEnd > pastMergeRow) {
+        pastMergeRow = mergeEnd;
+      }
+    });
+    if (pastMergeRow === candidate) return candidate;
+    candidate = pastMergeRow + 1;
+  }
+  return candidate;
+}
+
 function logTransaction_(body) {
   var result = { status: 'error', message: 'unknown error' };
 
@@ -369,7 +397,7 @@ function logTransaction_(body) {
     // yang sudah ada apa adanya -- urutannya otomatis kronologis (transaksi
     // pertama di atas, berikutnya di bawahnya), tanpa perlu menyusun ulang
     // formula sama sekali.
-    var targetRow = wasJustCreated ? 2 : firstEmptyRowFrom_(sheet, 4);
+    var targetRow = wasJustCreated ? 2 : firstEmptyRowFrom_(sheet, firstUsableRowFrom_(sheet, 4));
     var namaRekBank = parseKeterangan_(body.text);
     var nominal = ambilAngka_(body.amount);
 
@@ -444,7 +472,7 @@ function logManualEntry_(body) {
     }
 
     var now = new Date();
-    var targetRow = wasJustCreated ? 2 : firstEmptyRowFrom_(sheet, 4);
+    var targetRow = wasJustCreated ? 2 : firstEmptyRowFrom_(sheet, firstUsableRowFrom_(sheet, 4));
     var userId = String(body.userId || '').trim();
     var nama = String(body.name || '').trim();
     var nominal = ambilAngka_(body.amount);
