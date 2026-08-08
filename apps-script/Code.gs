@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'manual-paste-userid-07';
+var SCRIPT_VERSION = 'inspect-custom-row-08';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -50,7 +50,12 @@ function doGet(e) {
     if (action === 'list_spreadsheets') return jsonResponse_(listSpreadsheets_());
     if (action === 'list_sheets') return jsonResponse_(listSheetNames_(e.parameter.spreadsheetId || ''));
     if (action === 'inspect_sheet') {
-      return jsonResponse_(inspectSheet_(e.parameter.spreadsheetId || '', e.parameter.sheetName || ''));
+      return jsonResponse_(inspectSheet_(
+        e.parameter.spreadsheetId || '',
+        e.parameter.sheetName || '',
+        e.parameter.row ? Number(e.parameter.row) : null,
+        e.parameter.count ? Number(e.parameter.count) : null
+      ));
     }
     return jsonResponse_(buildStatus_());
   }
@@ -161,7 +166,7 @@ function listSheetNames_(spreadsheetId) {
  * dipakai untuk memahami struktur template sebelum mengubah logika
  * penulisan baris, tanpa mengubah data apa pun.
  */
-function inspectSheet_(spreadsheetId, sheetName) {
+function inspectSheet_(spreadsheetId, sheetName, customRow, customCount) {
   if (!spreadsheetId || !sheetName) {
     return { error: 'spreadsheetId dan sheetName wajib diisi' };
   }
@@ -184,13 +189,21 @@ function inspectSheet_(spreadsheetId, sheetName) {
     };
   }
 
-  return {
+  var result = {
     numCols: numCols,
     lastRow: sheet.getLastRow(),
     boundaryRow: boundaryRow,
     top: snapshot(1, 6),
     aroundBoundary: snapshot(boundaryRow - 5, 10)
   };
+
+  // row/count opsional lewat query string (?row=7&count=5) untuk intip baris
+  // manapun tanpa terikat jendela "top"/"aroundBoundary" bawaan.
+  if (customRow) {
+    result.custom = snapshot(customRow, customCount || 5);
+  }
+
+  return result;
 }
 
 /** Status koneksi tiap kategori (Spreadsheet & Sheet yang sedang aktif). */
