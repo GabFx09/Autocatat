@@ -11,6 +11,7 @@ import json
 import re
 import tkinter as tk
 from tkinter import font as tkfont
+from tkinter import ttk
 from urllib.request import Request, urlopen
 from urllib.error import URLError
 
@@ -19,6 +20,11 @@ WEB_APP_URL = (
     "AKfycbwmaD_puo3nZPzU5sfC84raKvut2bEkJSXviUO-PVyXY4g02fJ-7gBrRy2VFU6MOUN7mA/exec"
 )
 CATEGORY = "KAHURIPAN86"
+
+# Nama tab persis seperti di Google Sheets (case-sensitive) -- "Sheet3" bukan
+# "SHEET3", supaya cocok dengan getSheetByName di backend.
+SHEET_OPTIONS = ["TEST 1", "TEST 2", "Sheet3"]
+DEFAULT_SHEET = "TEST 2"
 
 # Label channel yang muncul sebagai penanda blok "channel / nama / no HP" di
 # clipboard. Nama pengirim yang diambil adalah baris tepat SETELAH channel
@@ -78,11 +84,12 @@ def parse_clipboard(text):
     return user_id, name, amount_digits
 
 
-def send_to_sheet(user_id, name, amount):
+def send_to_sheet(user_id, name, amount, sheet_name):
     payload = json.dumps(
         {
             "action": "log_manual",
             "category": CATEGORY,
+            "sheetName": sheet_name,
             "userId": user_id,
             "name": name,
             "amount": amount,
@@ -117,6 +124,21 @@ class App:
         )
         self.btn.pack(fill="x", padx=16, pady=(0, 10))
 
+        sheet_row = tk.Frame(root, bg="#1b1b1b")
+        sheet_row.pack(fill="x", padx=16, pady=(0, 10))
+
+        tk.Label(
+            sheet_row, text="Sheet tujuan:", font=status_font,
+            bg="#1b1b1b", fg="#cccccc",
+        ).pack(side="left")
+
+        self.sheet_var = tk.StringVar(value=DEFAULT_SHEET)
+        self.sheet_combo = ttk.Combobox(
+            sheet_row, textvariable=self.sheet_var, values=SHEET_OPTIONS,
+            state="readonly", width=14, font=status_font,
+        )
+        self.sheet_combo.pack(side="left", padx=(8, 0))
+
         self.status = tk.Label(
             root, text="Siap. Copy transaksi lalu klik tombol di atas.",
             font=status_font, bg="#1b1b1b", fg="#cccccc",
@@ -143,17 +165,22 @@ class App:
                 self.set_status(f"Gagal baca: {e}", "#e05d5d")
                 return
 
+            sheet_name = self.sheet_var.get()
             formatted = f"Rp{int(amount):,}".replace(",", ".")
-            self.set_status(f"Mengirim: {user_id} / {name} - {formatted} ...", "#f2c14e")
+            self.set_status(
+                f"Mengirim ke {sheet_name}: {user_id} / {name} - {formatted} ...", "#f2c14e"
+            )
 
             try:
-                result = send_to_sheet(user_id, name, amount)
+                result = send_to_sheet(user_id, name, amount, sheet_name)
             except URLError as e:
                 self.set_status(f"Gagal kirim (jaringan): {e}", "#e05d5d")
                 return
 
             if result.get("status") == "ok":
-                self.set_status(f"✓ Tercatat: {user_id} / {name} - {formatted}", "#7dd87d")
+                self.set_status(
+                    f"✓ Tercatat ke {sheet_name}: {user_id} / {name} - {formatted}", "#7dd87d"
+                )
             else:
                 self.set_status(f"✗ Ditolak server: {result.get('message')}", "#e05d5d")
         finally:

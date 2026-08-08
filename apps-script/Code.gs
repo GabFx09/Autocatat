@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'inspect-custom-row-08';
+var SCRIPT_VERSION = 'manual-sheet-override-09';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -418,7 +418,11 @@ function logManualEntry_(body) {
     }
 
     var spreadsheetId = props.getProperty('SPREADSHEET_ID_' + category);
-    var sheetName = props.getProperty('SHEET_NAME_' + category) || categoryDef.label;
+    // Tools bot-autopaste boleh kirim sheetName sendiri (dropdown pilihan
+    // TEST 1/TEST 2/SHEET3 dst di sisi tools) untuk menimpa tab default yang
+    // dikonfigurasi lewat Panel -- spreadsheet-nya tetap sama.
+    var sheetName = String(body.sheetName || '').trim() ||
+      props.getProperty('SHEET_NAME_' + category) || categoryDef.label;
 
     if (!spreadsheetId) {
       result.message = 'Belum ada Spreadsheet untuk ' + categoryDef.label +
