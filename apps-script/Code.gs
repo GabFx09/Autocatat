@@ -214,6 +214,24 @@ function parseKeterangan_(text) {
   return str;
 }
 
+/**
+ * Baris terakhir yang benar-benar berisi data di kolom A. Dipakai alih-alih
+ * sheet.getLastRow() biasa karena sheet dengan format/formula bawaan (mis.
+ * template kas) bisa membuat getLastRow() mengira ratusan baris kosong di
+ * bawahnya "terpakai", sehingga data baru nyasar jauh ke bawah.
+ */
+function lastRowInColumnA_(sheet) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow === 0) return 0;
+  var values = sheet.getRange(1, 1, lastRow, 1).getValues();
+  for (var i = values.length - 1; i >= 0; i--) {
+    if (values[i][0] !== '' && values[i][0] !== null) {
+      return i + 1;
+    }
+  }
+  return 0;
+}
+
 function logTransaction_(body) {
   var result = { status: 'error', message: 'unknown error' };
 
@@ -256,8 +274,7 @@ function logTransaction_(body) {
 
     var now = new Date();
     var waktuNotifikasi = body.timestamp ? new Date(body.timestamp) : now;
-    sheet.insertRowBefore(2);
-    var targetRow = 2;
+    var targetRow = lastRowInColumnA_(sheet) + 1;
     var namaRekBank = parseKeterangan_(body.text);
     var nominal = ambilAngka_(body.amount);
 
