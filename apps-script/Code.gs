@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'append-bottom-02';
+var SCRIPT_VERSION = 'row4-insert-formula-fix-03';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -279,6 +279,23 @@ function lastRowInColumnA_(sheet) {
   return 0;
 }
 
+/**
+ * Tulis ulang formula Saldo Bank (H), Pending (K), TERPROSES (L) untuk satu
+ * baris transaksi, mengikuti persis pola relatif template kas (mengacu ke
+ * baris tepat di atasnya): H=sum(H atas + G ini - I ini), dst. Dipakai untuk
+ * "menyambungkan" rantai formula setiap kali sebuah baris baru disisipkan,
+ * karena insertRowBefore sendiri tidak menyalin formula ke baris baru.
+ */
+function isiPolaFormulaTransaksi_(sheet, row) {
+  var above = row - 1;
+  sheet.getRange(row, 8).setFormula('=sum(H' + above + '+G' + row + '-I' + row + ')');
+  sheet.getRange(row, 11).setFormula('=SUMIF(D' + row + ';"";G' + row + ')+K' + above);
+  sheet.getRange(row, 12).setFormula(
+    '=if($M$1="";IF(D' + row + '="";0;G' + row + ')+L' + above +
+    ';if(B' + row + '=$M$1;G' + row + ';0)+L' + above + ')'
+  );
+}
+
 function logTransaction_(body) {
   var result = { status: 'error', message: 'unknown error' };
 
@@ -323,13 +340,20 @@ function logTransaction_(body) {
 
     var now = new Date();
     var waktuNotifikasi = body.timestamp ? new Date(body.timestamp) : now;
-    // Baris 4 dst berisi formula Saldo Bank/Pending/TERPROSES yang berantai
-    // ke baris tepat di atasnya (mis. Saldo Bank = Saldo Bank atas + Credit -
-    // Debit). Menyisipkan baris baru di tengah HANYA memindahkan baris lama
-    // ke bawah tanpa ikut menyalin formula itu ke baris baru, dan formula di
-    // baris lama tetap mengacu ke baris lamanya -- rantainya putus, Saldo
-    // Bank jadi salah. Templat ini cuma aman ditambah di baris paling bawah.
-    var targetRow = wasJustCreated ? 2 : (lastRowInColumnA_(sheet) + 1);
+    // Baris 1 = header, baris 2-3 = banner/saldo-awal (di-merge), baris 4 dst
+    // = transaksi dengan formula Saldo Bank/Pending/TERPROSES yang berantai
+    // ke baris tepat di atasnya. Sisip di baris 4 supaya transaksi terbaru
+    // selalu di atas, lalu isiPolaFormulaTransaksi_ menulis ulang formula di
+    // baris baru DAN baris di bawahnya (yang tadinya baris teratas) supaya
+    // rantainya tersambung lagi -- insertRowBefore saja tidak cukup karena
+    // baris baru tidak otomatis dapat formula, dan baris lama tetap mengacu
+    // ke baris sebelum baris baru (melompatinya).
+    var targetRow = wasJustCreated ? 2 : 4;
+    if (!wasJustCreated) {
+      sheet.insertRowBefore(targetRow);
+      isiPolaFormulaTransaksi_(sheet, targetRow);
+      isiPolaFormulaTransaksi_(sheet, targetRow + 1);
+    }
     var namaRekBank = parseKeterangan_(body.text);
     var nominal = ambilAngka_(body.amount);
 
