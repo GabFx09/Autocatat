@@ -32,21 +32,30 @@ class ParseError(Exception):
 
 
 def parse_clipboard(text):
-    """Ambil (nama_pengirim, nominal) dari teks clipboard transaksi.
+    """Ambil (user_id, nama_pengirim, nominal) dari teks clipboard transaksi.
 
     Aturan (dikonfirmasi dari contoh nyata pengguna):
-    - Ada beberapa baris "Rp <angka>" berdiri sendiri; baris PERTAMA adalah
-      kode/referensi/fee yang diabaikan, baris KEDUA adalah nominal transaksi
-      yang sebenarnya.
+    - Baris PERTAMA di clipboard adalah identitas/kode akun (mis.
+      "AHERIMUSTAFA07", "ARGONTARA") -- beda-beda per transaksi, dicatat apa
+      adanya ke kolom User ID.
+    - Setelah itu ada beberapa baris "Rp <angka>" berdiri sendiri; yang
+      PERTAMA adalah kode/referensi/fee yang diabaikan, yang KEDUA adalah
+      nominal transaksi yang sebenarnya.
     - Ada satu atau lebih blok 3 baris berurutan: nama channel (mis. DANA),
       lalu nama pengirim, lalu nomor HP. Blok PERTAMA dipakai (nama
       pengirim), blok berikutnya (biasanya nama admin/approver) diabaikan.
     - Baris "DP Approve : ..." / "DP Reject : ..." dan tanggal/jam diabaikan
-      sepenuhnya -- Jam Catat diisi otomatis pakai waktu saat tombol diklik.
+      sepenuhnya -- Jam Catat & Jam Kasih diisi otomatis pakai waktu saat
+      tombol diklik (transaksi yang di-paste dianggap sudah "DP Approve").
     """
     lines = [l.strip() for l in text.splitlines() if l.strip()]
+    if not lines:
+        raise ParseError("Clipboard kosong.")
 
-    rp_lines = [l for l in lines if re.fullmatch(r"Rp\.?\s*[\d.,]+", l, re.IGNORECASE)]
+    user_id = lines[0]
+    rest = lines[1:]
+
+    rp_lines = [l for l in rest if re.fullmatch(r"Rp\.?\s*[\d.,]+", l, re.IGNORECASE)]
     if len(rp_lines) < 2:
         raise ParseError(
             "Tidak ketemu 2 baris nominal ('Rp ...') di clipboard. "
@@ -57,21 +66,27 @@ def parse_clipboard(text):
         raise ParseError("Baris nominal kedua tidak berisi angka yang valid.")
 
     name = None
-    for i, line in enumerate(lines):
-        if line.upper() in CHANNEL_KEYWORDS and i + 1 < len(lines):
-            name = lines[i + 1]
+    for i, line in enumerate(rest):
+        if line.upper() in CHANNEL_KEYWORDS and i + 1 < len(rest):
+            name = rest[i + 1]
             break
     if not name:
         raise ParseError(
             "Tidak ketemu nama pengirim (baris setelah channel seperti DANA/OVO/dst.)."
         )
 
-    return name, amount_digits
+    return user_id, name, amount_digits
 
 
-def send_to_sheet(name, amount):
+def send_to_sheet(user_id, name, amount):
     payload = json.dumps(
-        {"action": "log_manual", "category": CATEGORY, "name": name, "amount": amount}
+        {
+            "action": "log_manual",
+            "category": CATEGORY,
+            "userId": user_id,
+            "name": name,
+            "amount": amount,
+        }
     ).encode("utf-8")
     req = Request(WEB_APP_URL, data=payload, headers={"Content-Type": "application/json"})
     with urlopen(req, timeout=60) as resp:
@@ -123,22 +138,22 @@ class App:
                 return
 
             try:
-                name, amount = parse_clipboard(clip)
+                user_id, name, amount = parse_clipboard(clip)
             except ParseError as e:
                 self.set_status(f"Gagal baca: {e}", "#e05d5d")
                 return
 
             formatted = f"Rp{int(amount):,}".replace(",", ".")
-            self.set_status(f"Mengirim: {name} - {formatted} ...", "#f2c14e")
+            self.set_status(f"Mengirim: {user_id} / {name} - {formatted} ...", "#f2c14e")
 
             try:
-                result = send_to_sheet(name, amount)
+                result = send_to_sheet(user_id, name, amount)
             except URLError as e:
                 self.set_status(f"Gagal kirim (jaringan): {e}", "#e05d5d")
                 return
 
             if result.get("status") == "ok":
-                self.set_status(f"✓ Tercatat: {name} - {formatted}", "#7dd87d")
+                self.set_status(f"✓ Tercatat: {user_id} / {name} - {formatted}", "#7dd87d")
             else:
                 self.set_status(f"✗ Ditolak server: {result.get('message')}", "#e05d5d")
         finally:

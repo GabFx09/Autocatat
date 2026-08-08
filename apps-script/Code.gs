@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'manual-paste-06';
+var SCRIPT_VERSION = 'manual-paste-userid-07';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -383,10 +383,13 @@ function logTransaction_(body) {
 
 /**
  * Tulis satu baris transaksi dari tools "bot-autopaste" (klik desktop, bukan
- * notifikasi HP) -- sumbernya sudah berupa nama & nominal siap pakai (tidak
- * perlu parseKeterangan_/type Masuk-Keluar seperti logTransaction_), dan
- * kolom E (User ID) sengaja diisi nama kategori sebagai penanda baris ini
- * berasal dari tools paste, bukan dari notifikasi HP atau isian manual.
+ * notifikasi HP) -- sumbernya sudah berupa userId/nama/nominal siap pakai
+ * (diparse dari clipboard di sisi tools, tidak perlu parseKeterangan_/type
+ * Masuk-Keluar seperti logTransaction_). Kolom E (User ID) diisi identitas
+ * yang diambil dari baris pertama clipboard (mis. "AHERIMUSTAFA07"), beda
+ * per transaksi -- bukan nama kategori. Jam Kasih diisi bareng Jam Catat
+ * (bukan lewat onEdit) karena transaksi yang di-paste sudah berstatus
+ * "DP Approve" -- dianggap sudah dikonfirmasi saat tombol diklik.
  */
 function logManualEntry_(body) {
   var result = { status: 'error', message: 'unknown error' };
@@ -425,14 +428,16 @@ function logManualEntry_(body) {
 
     var now = new Date();
     var targetRow = wasJustCreated ? 2 : firstEmptyRowFrom_(sheet, 4);
+    var userId = String(body.userId || '').trim();
     var nama = String(body.name || '').trim();
     var nominal = ambilAngka_(body.amount);
+    var waktu = Utilities.formatDate(now, TIMEZONE, 'HH:mm:ss');
 
-    // Kolom B (OP Proses) dan D (Jam Kasih) sengaja dikosongkan, sama
-    // seperti alur notifikasi HP.
+    // Kolom B (OP Proses) sengaja dikosongkan, sama seperti alur notifikasi HP.
     sheet.getRange(targetRow, 1).setValue(Utilities.formatDate(now, TIMEZONE, 'dd/MM/yyyy'));
-    sheet.getRange(targetRow, 3).setValue(Utilities.formatDate(now, TIMEZONE, 'HH:mm:ss'));
-    sheet.getRange(targetRow, 5).setValue(categoryDef.label);
+    sheet.getRange(targetRow, 3).setValue(waktu);
+    sheet.getRange(targetRow, 4).setValue(waktu);
+    sheet.getRange(targetRow, 5).setValue(userId);
     sheet.getRange(targetRow, 6).setValue(nama);
     sheet.getRange(targetRow, 7).setValue(nominal);
     sheet.getRange(targetRow, 6, 1, 2).setBackground(WARNA_MASUK);
