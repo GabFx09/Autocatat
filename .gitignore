@@ -13,3 +13,8 @@ captures/
 .cxx/
 *.apk
 !android-app/gradle/wrapper/gradle-wrapper.jar
+
+# Python / PyInstaller (bot-autopaste)
+bot-autopaste/dist/
+bot-autopaste/__pycache__/
+bot-autopaste/*.spec
