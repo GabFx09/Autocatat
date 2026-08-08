@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'row4-insert-01';
+var SCRIPT_VERSION = 'append-bottom-02';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -323,12 +323,13 @@ function logTransaction_(body) {
 
     var now = new Date();
     var waktuNotifikasi = body.timestamp ? new Date(body.timestamp) : now;
-    // Baris 1 = header, baris 2-3 = banner/saldo-awal yang di-merge (template
-    // kas bawaan), baris 4 dst = transaksi dengan formula relatif ke baris di
-    // atasnya. Sisip di baris 4 (bukan 2) supaya transaksi terbaru tetap di
-    // atas tanpa menyentuh merge cell di baris 2-3.
-    var targetRow = wasJustCreated ? 2 : 4;
-    sheet.insertRowBefore(targetRow);
+    // Baris 4 dst berisi formula Saldo Bank/Pending/TERPROSES yang berantai
+    // ke baris tepat di atasnya (mis. Saldo Bank = Saldo Bank atas + Credit -
+    // Debit). Menyisipkan baris baru di tengah HANYA memindahkan baris lama
+    // ke bawah tanpa ikut menyalin formula itu ke baris baru, dan formula di
+    // baris lama tetap mengacu ke baris lamanya -- rantainya putus, Saldo
+    // Bank jadi salah. Templat ini cuma aman ditambah di baris paling bawah.
+    var targetRow = wasJustCreated ? 2 : (lastRowInColumnA_(sheet) + 1);
     var namaRekBank = parseKeterangan_(body.text);
     var nominal = ambilAngka_(body.amount);
 
