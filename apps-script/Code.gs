@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'skip-banner-merge-10';
+var SCRIPT_VERSION = 'skip-banner-merge-11';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -333,15 +333,15 @@ function firstUsableRowFrom_(sheet, minRow) {
   var candidate = minRow;
   for (var guard = 0; guard < 50; guard++) {
     var merges = sheet.getRange(candidate, 1, 1, sheet.getMaxColumns()).getMergedRanges();
-    var pastMergeRow = candidate;
+    var nextRow = candidate;
     merges.forEach(function (m) {
       var mergeEnd = m.getRow() + m.getNumRows() - 1;
-      if (m.getNumRows() > 1 && mergeEnd > pastMergeRow) {
-        pastMergeRow = mergeEnd;
+      if (m.getNumRows() > 1) {
+        nextRow = Math.max(nextRow, mergeEnd + 1);
       }
     });
-    if (pastMergeRow === candidate) return candidate;
-    candidate = pastMergeRow + 1;
+    if (nextRow === candidate) return candidate;
+    candidate = nextRow;
   }
   return candidate;
 }
