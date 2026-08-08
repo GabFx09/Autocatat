@@ -3,7 +3,7 @@
 Alur: buka aplikasi PPOB/admin panel di browser, select & copy detail
 transaksi, lalu klik tombol "Baca Clipboard & Catat" di jendela kecil ini.
 Tidak perlu isi apa pun manual -- teksnya diparse otomatis lalu dikirim ke
-backend NotifLogger (kategori KAHURIPAN86) lewat HTTP POST, sama seperti
+backend NotifLogger (kategori AUTOPASTE) lewat HTTP POST, sama seperti
 notifikasi dari aplikasi Android.
 """
 
@@ -19,7 +19,7 @@ WEB_APP_URL = (
     "https://script.google.com/macros/s/"
     "AKfycbwmaD_puo3nZPzU5sfC84raKvut2bEkJSXviUO-PVyXY4g02fJ-7gBrRy2VFU6MOUN7mA/exec"
 )
-CATEGORY = "KAHURIPAN86"
+CATEGORY = "AUTOPASTE"
 
 # Nama tab persis seperti di Google Sheets (case-sensitive), supaya cocok
 # dengan getSheetByName di backend. TEST 1/TEST 2/Sheet3 sudah di-rename jadi

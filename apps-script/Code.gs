@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'skip-banner-merge-11';
+var SCRIPT_VERSION = 'rename-autopaste-12';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -40,7 +40,7 @@ var CATEGORIES = [
   { key: 'OVO', label: 'OVO' },
   { key: 'LINKAJA', label: 'LinkAja' },
   { key: 'GOPAY', label: 'GoPay' },
-  { key: 'KAHURIPAN86', label: 'KAHURIPAN86' }
+  { key: 'AUTOPASTE', label: 'AUTOPASTE' }
 ];
 
 function doGet(e) {
