@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'first-empty-row-05';
+var SCRIPT_VERSION = 'manual-paste-06';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -39,7 +39,8 @@ var CATEGORIES = [
   { key: 'DANA', label: 'DANA' },
   { key: 'OVO', label: 'OVO' },
   { key: 'LINKAJA', label: 'LinkAja' },
-  { key: 'GOPAY', label: 'GoPay' }
+  { key: 'GOPAY', label: 'GoPay' },
+  { key: 'KAHURIPAN86', label: 'KAHURIPAN86' }
 ];
 
 function doGet(e) {
@@ -76,6 +77,9 @@ function doPost(e) {
   }
   if (body.action === 'remove_spreadsheet') {
     return jsonResponse_(removeAllowedSpreadsheet_(body.spreadsheetId || ''));
+  }
+  if (body.action === 'log_manual') {
+    return logManualEntry_(body);
   }
 
   return logTransaction_(body);
@@ -367,6 +371,71 @@ function logTransaction_(body) {
     // sama seperti aturan onEdit -- ditulis langsung di sini karena onEdit
     // tidak terpicu untuk penulisan otomatis dari script.
     sheet.getRange(targetRow, 3).setValue(Utilities.formatDate(now, TIMEZONE, 'HH:mm:ss'));
+
+    result.status = 'ok';
+    result.message = 'Tercatat ke ' + categoryDef.label;
+  } catch (err) {
+    result.message = err.toString();
+  }
+
+  return jsonResponse_(result);
+}
+
+/**
+ * Tulis satu baris transaksi dari tools "bot-autopaste" (klik desktop, bukan
+ * notifikasi HP) -- sumbernya sudah berupa nama & nominal siap pakai (tidak
+ * perlu parseKeterangan_/type Masuk-Keluar seperti logTransaction_), dan
+ * kolom E (User ID) sengaja diisi nama kategori sebagai penanda baris ini
+ * berasal dari tools paste, bukan dari notifikasi HP atau isian manual.
+ */
+function logManualEntry_(body) {
+  var result = { status: 'error', message: 'unknown error' };
+
+  try {
+    var category = String(body.category || '').toUpperCase();
+    var props = PropertiesService.getScriptProperties();
+
+    var categoryDef = CATEGORIES.filter(function (c) { return c.key === category; })[0];
+    if (!categoryDef) {
+      result.message = 'Kategori tidak dikenali: ' + category;
+      return jsonResponse_(result);
+    }
+
+    var spreadsheetId = props.getProperty('SPREADSHEET_ID_' + category);
+    var sheetName = props.getProperty('SHEET_NAME_' + category) || categoryDef.label;
+
+    if (!spreadsheetId) {
+      result.message = 'Belum ada Spreadsheet untuk ' + categoryDef.label +
+        '. Atur dulu lewat Panel di browser.';
+      return jsonResponse_(result);
+    }
+
+    var ss = SpreadsheetApp.openById(spreadsheetId);
+    var sheet = ss.getSheetByName(sheetName);
+    var wasJustCreated = false;
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+      sheet.appendRow([
+        'Tanggal', 'Kode', 'Jam Catat', 'Jam Kasih', 'User ID',
+        'Nama Rek Bank', 'Credit', 'Saldo Bank', 'Debit'
+      ]);
+      sheet.setFrozenRows(1);
+      wasJustCreated = true;
+    }
+
+    var now = new Date();
+    var targetRow = wasJustCreated ? 2 : firstEmptyRowFrom_(sheet, 4);
+    var nama = String(body.name || '').trim();
+    var nominal = ambilAngka_(body.amount);
+
+    // Kolom B (OP Proses) dan D (Jam Kasih) sengaja dikosongkan, sama
+    // seperti alur notifikasi HP.
+    sheet.getRange(targetRow, 1).setValue(Utilities.formatDate(now, TIMEZONE, 'dd/MM/yyyy'));
+    sheet.getRange(targetRow, 3).setValue(Utilities.formatDate(now, TIMEZONE, 'HH:mm:ss'));
+    sheet.getRange(targetRow, 5).setValue(categoryDef.label);
+    sheet.getRange(targetRow, 6).setValue(nama);
+    sheet.getRange(targetRow, 7).setValue(nominal);
+    sheet.getRange(targetRow, 6, 1, 2).setBackground(WARNA_MASUK);
 
     result.status = 'ok';
     result.message = 'Tercatat ke ' + categoryDef.label;
