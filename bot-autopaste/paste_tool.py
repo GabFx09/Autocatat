@@ -114,12 +114,20 @@ def fetch_sheet_options():
     return sheets, default
 
 
-def send_to_sheet(user_id, name, amount, sheet_name):
+def fetch_operator_codes():
+    """Kode operator (kolom B) dikelola lewat Panel, bukan hardcode di sini,
+    supaya nambah/hapus kode tidak perlu edit kode + build ulang exe."""
+    codes = fetch_json(WEB_APP_URL + "?format=json&action=list_operator_codes")
+    return codes if isinstance(codes, list) else []
+
+
+def send_to_sheet(user_id, name, amount, sheet_name, op_code):
     payload = json.dumps(
         {
             "action": "log_manual",
             "category": CATEGORY,
             "sheetName": sheet_name,
+            "opCode": op_code,
             "userId": user_id,
             "name": name,
             "amount": amount,
@@ -176,6 +184,24 @@ class App:
         )
         self.refresh_btn.pack(side="left", padx=(4, 0))
 
+        op_row = tk.Frame(root, bg="#1b1b1b")
+        op_row.pack(fill="x", padx=16, pady=(0, 10))
+
+        tk.Label(
+            op_row, text="Kode operator:", font=status_font,
+            bg="#1b1b1b", fg="#cccccc",
+        ).pack(side="left")
+
+        # Combobox biasa (bukan readonly) -- bisa pilih dari daftar yang
+        # dikelola di Panel, TAPI juga bisa diketik bebas kalau kodenya
+        # belum ada di daftar.
+        self.op_code_var = tk.StringVar(value="")
+        self.op_code_combo = ttk.Combobox(
+            op_row, textvariable=self.op_code_var, values=[],
+            width=14, font=status_font,
+        )
+        self.op_code_combo.pack(side="left", padx=(8, 0))
+
         self.status = tk.Label(
             root, text="Memuat daftar sheet...",
             font=status_font, bg="#1b1b1b", fg="#cccccc",
@@ -184,6 +210,7 @@ class App:
         self.status.pack(fill="x", padx=16, pady=(0, 14))
 
         self.load_sheet_options()
+        threading.Thread(target=self._load_operator_codes_worker, daemon=True).start()
 
     def set_status(self, text, color="#cccccc"):
         self.status.configure(text=text, fg=color)
@@ -202,6 +229,15 @@ class App:
             self.root.after(0, lambda: self._on_sheets_loaded(None, None, e))
             return
         self.root.after(0, lambda: self._on_sheets_loaded(sheets, default, None))
+
+    def _load_operator_codes_worker(self):
+        try:
+            codes = fetch_operator_codes()
+        except Exception:
+            # Gagal ambil kode operator bukan hal fatal -- tetap bisa diketik
+            # bebas, cuma tidak ada daftar sarannya.
+            return
+        self.root.after(0, lambda: self.op_code_combo.configure(values=codes))
 
     def _on_sheets_loaded(self, sheets, default, error):
         if error is not None:
@@ -241,6 +277,7 @@ class App:
             return
 
         sheet_name = self.sheet_var.get()
+        op_code = self.op_code_var.get().strip().upper()
         formatted = f"Rp{int(amount):,}".replace(",", ".")
         self.set_status(
             f"Mengirim ke {sheet_name}: {user_id} / {name} - {formatted} ...", "#f2c14e"
@@ -251,13 +288,13 @@ class App:
         self.btn.configure(state="disabled")
         threading.Thread(
             target=self._send_worker,
-            args=(user_id, name, amount, sheet_name, formatted),
+            args=(user_id, name, amount, sheet_name, op_code, formatted),
             daemon=True,
         ).start()
 
-    def _send_worker(self, user_id, name, amount, sheet_name, formatted):
+    def _send_worker(self, user_id, name, amount, sheet_name, op_code, formatted):
         try:
-            result = send_to_sheet(user_id, name, amount, sheet_name)
+            result = send_to_sheet(user_id, name, amount, sheet_name, op_code)
         except URLError as e:
             self.root.after(0, lambda: self._on_send_done(
                 False, f"Gagal kirim (jaringan): {e}"

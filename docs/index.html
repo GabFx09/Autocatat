@@ -202,6 +202,20 @@
 
     <section class="panel">
       <div class="panel-head">
+        <h2>Kode Operator</h2>
+        <span>Pilihan kolom B (OP Proses) di bot-autopaste</span>
+      </div>
+      <div class="panel-body">
+        <div class="add-row">
+          <input type="text" id="newOperatorCode" placeholder="Contoh: GAB">
+          <button type="button" id="addOperatorCodeBtn">Tambah</button>
+        </div>
+        <ul class="ledger" id="operatorCodeList"></ul>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
         <h2>Bank &amp; E-wallet</h2>
         <span>Pilih tujuan pencatatan tiap saluran</span>
       </div>
@@ -230,6 +244,7 @@ var CATEGORIES = [
 ];
 
 var spreadsheets = [];
+var operatorCodes = [];
 var status = {};
 
 function showNotice(message, isError) {
@@ -273,6 +288,29 @@ function renderAllowedList() {
           spreadsheets = res.spreadsheets || [];
           renderAllowedList();
           renderCategoryCards();
+          showNotice(res.message, false);
+        });
+    });
+  });
+}
+
+function renderOperatorCodeList() {
+  var ul = document.getElementById("operatorCodeList");
+  if (operatorCodes.length === 0) {
+    ul.innerHTML = '<li class="empty">Belum ada kode operator &mdash; tambahkan di atas.</li>';
+    return;
+  }
+  ul.innerHTML = operatorCodes.map(function (code) {
+    return '<li><span class="name">' + code + '</span>' +
+      '<button type="button" class="remove-btn" data-code="' + code + '">Hapus</button></li>';
+  }).join("");
+
+  ul.querySelectorAll(".remove-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      apiPost({ action: "remove_operator_code", code: btn.getAttribute("data-code") })
+        .then(function (res) {
+          operatorCodes = res.codes || [];
+          renderOperatorCodeList();
           showNotice(res.message, false);
         });
     });
@@ -355,6 +393,20 @@ document.getElementById("addSpreadsheetBtn").addEventListener("click", function 
   });
 });
 
+document.getElementById("addOperatorCodeBtn").addEventListener("click", function () {
+  var input = document.getElementById("newOperatorCode");
+  var code = input.value.trim();
+  if (!code) return;
+  apiPost({ action: "add_operator_code", code: code }).then(function (res) {
+    showNotice(res.message, res.status !== "ok");
+    if (res.status === "ok") {
+      operatorCodes = res.codes || [];
+      input.value = "";
+      renderOperatorCodeList();
+    }
+  });
+});
+
 document.getElementById("configForm").addEventListener("submit", function (ev) {
   ev.preventDefault();
   var configs = {};
@@ -377,12 +429,15 @@ document.getElementById("configForm").addEventListener("submit", function (ev) {
 
 Promise.all([
   apiGet("?format=json&action=list_spreadsheets"),
+  apiGet("?format=json&action=list_operator_codes"),
   apiGet("?format=json")
 ]).then(function (results) {
   spreadsheets = results[0];
-  status = results[1];
+  operatorCodes = results[1];
+  status = results[2];
   updateSummary();
   renderAllowedList();
+  renderOperatorCodeList();
   renderCategoryCards();
 }).catch(function () {
   showNotice("Gagal menghubungi backend. Cek koneksi internet, atau pastikan Apps Script sudah di-deploy dengan akses “Anyone”.", true);
