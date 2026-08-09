@@ -14,8 +14,15 @@ data class ParsedTransaction(
  */
 object TransactionParser {
 
-    private val AMOUNT_PATTERN: Pattern = Pattern.compile(
+    // Format "Rp1.234.000" -- titik/koma dianggap pemisah ribuan, tanpa desimal.
+    private val RP_AMOUNT_PATTERN: Pattern = Pattern.compile(
         "Rp\\.?\\s?([\\d]{1,3}(?:[.,]\\d{3})*(?:[.,]\\d{2})?)",
+        Pattern.CASE_INSENSITIVE
+    )
+
+    // Format "IDR 5,000.00" -- koma pemisah ribuan, titik desimal (sen dibuang).
+    private val IDR_AMOUNT_PATTERN: Pattern = Pattern.compile(
+        "IDR\\.?\\s?([\\d]{1,3}(?:,\\d{3})*(?:\\.\\d{2})?)",
         Pattern.CASE_INSENSITIVE
     )
 
@@ -30,8 +37,7 @@ object TransactionParser {
     )
 
     fun parse(text: String): ParsedTransaction {
-        val matcher = AMOUNT_PATTERN.matcher(text)
-        val amount = if (matcher.find()) "Rp${matcher.group(1)}" else null
+        val amount = extractAmount(text)
 
         val lower = text.lowercase()
         val type = when {
@@ -41,5 +47,24 @@ object TransactionParser {
         }
 
         return ParsedTransaction(amount, type)
+    }
+
+    // Selalu kembalikan string berisi digit murni nominal (mis. "Rp5000"),
+    // supaya sisi server (yang cuma membuang karakter non-digit) tidak
+    // salah baca pemisah ribuan/desimal dari format sumber yang beda-beda.
+    private fun extractAmount(text: String): String? {
+        val rpMatcher = RP_AMOUNT_PATTERN.matcher(text)
+        if (rpMatcher.find()) {
+            val digits = rpMatcher.group(1).replace(Regex("[^0-9]"), "")
+            return "Rp$digits"
+        }
+
+        val idrMatcher = IDR_AMOUNT_PATTERN.matcher(text)
+        if (idrMatcher.find()) {
+            val integerPart = idrMatcher.group(1).substringBefore(".").replace(",", "")
+            return "Rp$integerPart"
+        }
+
+        return null
     }
 }

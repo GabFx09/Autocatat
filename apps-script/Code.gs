@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'remove-op-code-panel-15';
+var SCRIPT_VERSION = 'fix-bca-idr-format-16';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -263,7 +263,11 @@ function ambilAngka_(rp) {
  * Ambil bagian "keterangan" dari notifikasi, mis. dari:
  * "...KET.:ATMLTRPRM B9527 000547856 52920100897450"
  * jadi "ATMLTRPRM B9527 000547856" (nomor rekening panjang di akhir dibuang).
- * Kalau pola "KET" tidak ditemukan, pakai teks aslinya apa adanya.
+ * Juga menangani format notifikasi app BCA yang lebih baru, mis.
+ * "Pemasukan sebesar IDR 5,000.00 dari **NI SETI****TI di kategori
+ * Transfer Rekening" -> "**NI SETI****TI" (nama pengirim, sudah termasuk
+ * penyamaran bintang dari BCA sendiri, bukan hasil parsing yang salah).
+ * Kalau tidak ada pola yang cocok, pakai teks aslinya apa adanya.
  */
 function parseKeterangan_(text) {
   if (!text) return '';
@@ -274,6 +278,9 @@ function parseKeterangan_(text) {
 
   var simple = str.match(/KET[.:]+\s*(.+)$/i);
   if (simple) return simple[1].trim();
+
+  var dariKategori = str.match(/\bdari\s+(.+?)\s+di kategori\b/i);
+  if (dariKategori) return dariKategori[1].trim();
 
   return str;
 }
