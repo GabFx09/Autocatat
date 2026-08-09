@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'rename-autopaste-12';
+var SCRIPT_VERSION = 'batch-write-13';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -401,17 +401,24 @@ function logTransaction_(body) {
     var namaRekBank = parseKeterangan_(body.text);
     var nominal = ambilAngka_(body.amount);
 
-    // Kolom B (OP Proses), D (Jam Kasih), dan E (User ID) sengaja tidak
-    // ditulis -- semuanya dikosongkan untuk transaksi otomatis, Jam Kasih
-    // baru terisi manual lewat onEdit begitu User ID diisi orang.
-    sheet.getRange(targetRow, 1).setValue(Utilities.formatDate(waktuNotifikasi, TIMEZONE, 'dd/MM/yyyy'));
-    sheet.getRange(targetRow, 6).setValue(namaRekBank);
-    sheet.getRange(targetRow, 7).setValue(nominal);
+    // Kolom B (OP Proses), D (Jam Kasih), dan E (User ID) sengaja dikosongkan
+    // untuk transaksi otomatis -- Jam Kasih baru terisi manual lewat onEdit
+    // begitu User ID diisi orang. Ditulis SEKALIGUS satu baris (A..G) lewat
+    // setValues -- bukan 4 panggilan getRange/setValue terpisah seperti
+    // sebelumnya -- supaya lebih cepat (tiap panggilan Range API di Apps
+    // Script punya overhead sendiri). Nama Rek Bank & Credit sudah terisi ->
+    // Jam Catat otomatis terisi juga di kolom yang sama, sama seperti aturan
+    // onEdit (yang tidak terpicu untuk penulisan otomatis dari script).
+    sheet.getRange(targetRow, 1, 1, 7).setValues([[
+      Utilities.formatDate(waktuNotifikasi, TIMEZONE, 'dd/MM/yyyy'),
+      '',
+      Utilities.formatDate(now, TIMEZONE, 'HH:mm:ss'),
+      '',
+      '',
+      namaRekBank,
+      nominal
+    ]]);
     sheet.getRange(targetRow, 6, 1, 2).setBackground(WARNA_MASUK);
-    // Nama Rek Bank & Credit sudah terisi -> Jam Catat otomatis terisi juga,
-    // sama seperti aturan onEdit -- ditulis langsung di sini karena onEdit
-    // tidak terpicu untuk penulisan otomatis dari script.
-    sheet.getRange(targetRow, 3).setValue(Utilities.formatDate(now, TIMEZONE, 'HH:mm:ss'));
 
     result.status = 'ok';
     result.message = 'Tercatat ke ' + categoryDef.label;
@@ -478,13 +485,18 @@ function logManualEntry_(body) {
     var nominal = ambilAngka_(body.amount);
     var waktu = Utilities.formatDate(now, TIMEZONE, 'HH:mm:ss');
 
-    // Kolom B (OP Proses) sengaja dikosongkan, sama seperti alur notifikasi HP.
-    sheet.getRange(targetRow, 1).setValue(Utilities.formatDate(now, TIMEZONE, 'dd/MM/yyyy'));
-    sheet.getRange(targetRow, 3).setValue(waktu);
-    sheet.getRange(targetRow, 4).setValue(waktu);
-    sheet.getRange(targetRow, 5).setValue(userId);
-    sheet.getRange(targetRow, 6).setValue(nama);
-    sheet.getRange(targetRow, 7).setValue(nominal);
+    // Kolom B (OP Proses) sengaja dikosongkan, sama seperti alur notifikasi
+    // HP. Ditulis sekaligus satu baris (A..G) lewat setValues, bukan 5
+    // panggilan getRange/setValue terpisah, supaya lebih cepat.
+    sheet.getRange(targetRow, 1, 1, 7).setValues([[
+      Utilities.formatDate(now, TIMEZONE, 'dd/MM/yyyy'),
+      '',
+      waktu,
+      waktu,
+      userId,
+      nama,
+      nominal
+    ]]);
     sheet.getRange(targetRow, 6, 1, 2).setBackground(WARNA_MASUK);
 
     result.status = 'ok';

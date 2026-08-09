@@ -228,40 +228,53 @@ class App:
             self.set_status("Pilih tab tujuan di dropdown dulu sebelum kirim.", "#e05d5d")
             return
 
-        self.btn.configure(state="disabled")
         try:
-            try:
-                clip = self.root.clipboard_get()
-            except tk.TclError:
-                self.set_status("Clipboard kosong / bukan teks.", "#e05d5d")
-                return
+            clip = self.root.clipboard_get()
+        except tk.TclError:
+            self.set_status("Clipboard kosong / bukan teks.", "#e05d5d")
+            return
 
-            try:
-                user_id, name, amount = parse_clipboard(clip)
-            except ParseError as e:
-                self.set_status(f"Gagal baca: {e}", "#e05d5d")
-                return
+        try:
+            user_id, name, amount = parse_clipboard(clip)
+        except ParseError as e:
+            self.set_status(f"Gagal baca: {e}", "#e05d5d")
+            return
 
-            sheet_name = self.sheet_var.get()
-            formatted = f"Rp{int(amount):,}".replace(",", ".")
-            self.set_status(
-                f"Mengirim ke {sheet_name}: {user_id} / {name} - {formatted} ...", "#f2c14e"
-            )
+        sheet_name = self.sheet_var.get()
+        formatted = f"Rp{int(amount):,}".replace(",", ".")
+        self.set_status(
+            f"Mengirim ke {sheet_name}: {user_id} / {name} - {formatted} ...", "#f2c14e"
+        )
+        # Kirim di thread terpisah -- urlopen memblokir beberapa detik, dan
+        # kalau dijalankan langsung di main thread jendelanya kelihatan macet
+        # (tidak bisa digeser/di-drag) selagi menunggu balasan server.
+        self.btn.configure(state="disabled")
+        threading.Thread(
+            target=self._send_worker,
+            args=(user_id, name, amount, sheet_name, formatted),
+            daemon=True,
+        ).start()
 
-            try:
-                result = send_to_sheet(user_id, name, amount, sheet_name)
-            except URLError as e:
-                self.set_status(f"Gagal kirim (jaringan): {e}", "#e05d5d")
-                return
+    def _send_worker(self, user_id, name, amount, sheet_name, formatted):
+        try:
+            result = send_to_sheet(user_id, name, amount, sheet_name)
+        except URLError as e:
+            self.root.after(0, lambda: self._on_send_done(
+                False, f"Gagal kirim (jaringan): {e}"
+            ))
+            return
+        if result.get("status") == "ok":
+            self.root.after(0, lambda: self._on_send_done(
+                True, f"✓ Tercatat ke {sheet_name}: {user_id} / {name} - {formatted}"
+            ))
+        else:
+            self.root.after(0, lambda: self._on_send_done(
+                False, f"✗ Ditolak server: {result.get('message')}"
+            ))
 
-            if result.get("status") == "ok":
-                self.set_status(
-                    f"✓ Tercatat ke {sheet_name}: {user_id} / {name} - {formatted}", "#7dd87d"
-                )
-            else:
-                self.set_status(f"✗ Ditolak server: {result.get('message')}", "#e05d5d")
-        finally:
-            self.btn.configure(state="normal")
+    def _on_send_done(self, success, message):
+        self.set_status(message, "#7dd87d" if success else "#e05d5d")
+        self.btn.configure(state="normal")
 
 
 if __name__ == "__main__":
