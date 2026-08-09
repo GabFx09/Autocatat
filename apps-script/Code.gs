@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'operator-code-14';
+var SCRIPT_VERSION = 'remove-op-code-panel-15';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -49,7 +49,6 @@ function doGet(e) {
   if (e.parameter.format === 'json') {
     if (action === 'list_spreadsheets') return jsonResponse_(listSpreadsheets_());
     if (action === 'list_sheets') return jsonResponse_(listSheetNames_(e.parameter.spreadsheetId || ''));
-    if (action === 'list_operator_codes') return jsonResponse_(listOperatorCodes_());
     if (action === 'inspect_sheet') {
       return jsonResponse_(inspectSheet_(
         e.parameter.spreadsheetId || '',
@@ -83,12 +82,6 @@ function doPost(e) {
   }
   if (body.action === 'remove_spreadsheet') {
     return jsonResponse_(removeAllowedSpreadsheet_(body.spreadsheetId || ''));
-  }
-  if (body.action === 'add_operator_code') {
-    return jsonResponse_(addOperatorCode_(body.code || ''));
-  }
-  if (body.action === 'remove_operator_code') {
-    return jsonResponse_(removeOperatorCode_(body.code || ''));
   }
   if (body.action === 'log_manual') {
     return logManualEntry_(body);
@@ -153,49 +146,6 @@ function removeAllowedSpreadsheet_(id) {
 /** Daftar Spreadsheet yang sudah di-allow-list, untuk dropdown. */
 function listSpreadsheets_() {
   return getAllowedSpreadsheets_().sort(function (a, b) { return a.name.localeCompare(b.name); });
-}
-
-/**
- * Kode operator (kolom B / "OP Proses") yang boleh dipilih dari dropdown
- * bot-autopaste -- dikelola manual lewat Panel, sama seperti daftar
- * Spreadsheet, supaya user bisa tambah/hapus kode sendiri tanpa perlu edit
- * kode atau build ulang exe.
- */
-function getOperatorCodes_() {
-  var raw = PropertiesService.getScriptProperties().getProperty('OPERATOR_CODES');
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw);
-  } catch (err) {
-    return [];
-  }
-}
-
-function saveOperatorCodes_(list) {
-  PropertiesService.getScriptProperties().setProperty('OPERATOR_CODES', JSON.stringify(list));
-}
-
-function listOperatorCodes_() {
-  return getOperatorCodes_().slice().sort();
-}
-
-function addOperatorCode_(code) {
-  var trimmed = String(code || '').trim().toUpperCase();
-  if (!trimmed) {
-    return { status: 'error', message: 'Kode operator tidak boleh kosong' };
-  }
-  var list = getOperatorCodes_();
-  if (list.indexOf(trimmed) === -1) {
-    list.push(trimmed);
-    saveOperatorCodes_(list);
-  }
-  return { status: 'ok', message: 'Ditambahkan: ' + trimmed, codes: listOperatorCodes_() };
-}
-
-function removeOperatorCode_(code) {
-  var list = getOperatorCodes_().filter(function (c) { return c !== code; });
-  saveOperatorCodes_(list);
-  return { status: 'ok', message: 'Dihapus', codes: listOperatorCodes_() };
 }
 
 /** Nama-nama tab/sheet di dalam satu Spreadsheet, untuk dropdown. */
