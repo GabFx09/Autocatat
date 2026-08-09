@@ -9,6 +9,7 @@ notifikasi dari aplikasi Android.
 
 import json
 import re
+import threading
 import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import ttk
@@ -20,15 +21,6 @@ WEB_APP_URL = (
     "AKfycbwmaD_puo3nZPzU5sfC84raKvut2bEkJSXviUO-PVyXY4g02fJ-7gBrRy2VFU6MOUN7mA/exec"
 )
 CATEGORY = "AUTOPASTE"
-
-# Nama tab persis seperti di Google Sheets (case-sensitive), supaya cocok
-# dengan getSheetByName di backend. Sengaja cuma "TEST B" -- kategori
-# AUTOPASTE sekarang menunjuk ke spreadsheet produksi "DEPOSIT IT ( 6-10 )"
-# yang tab aslinya bernama per-teller (BCA_SARAH, BRI_VICTOR, dst, bukan
-# BCA/BRI/dst polos), jadi dropdown lama salah kirim dan bikin tab kosong
-# baru ("BRI") ke-generate otomatis di spreadsheet produksi itu.
-SHEET_OPTIONS = ["TEST B"]
-DEFAULT_SHEET = "TEST B"
 
 # Label channel yang muncul sebagai penanda blok "channel / nama / no HP" di
 # clipboard. Nama pengirim yang diambil adalah baris tepat SETELAH channel
@@ -88,6 +80,40 @@ def parse_clipboard(text):
     return user_id, name, amount_digits
 
 
+def fetch_json(url):
+    with urlopen(url, timeout=30) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def fetch_sheet_options():
+    """Ambil daftar tab langsung dari spreadsheet yang dikonfigurasi untuk
+    kategori AUTOPASTE di Panel -- supaya dropdown ini tidak pernah nyasar
+    ke nama tab yang sebenarnya tidak ada (lihat catatan di bawah soal
+    backend yang auto-create sheet kalau nama tidak ketemu), dan supaya
+    menambah/mengubah pilihan tidak perlu edit kode + build ulang exe.
+    """
+    status = fetch_json(WEB_APP_URL + "?format=json")
+    cat = status.get(CATEGORY) or {}
+    spreadsheet_id = cat.get("spreadsheetId") or ""
+    if not spreadsheet_id:
+        raise RuntimeError(f"Kategori {CATEGORY} belum diatur di Panel.")
+
+    sheets = fetch_json(
+        WEB_APP_URL + "?format=json&action=list_sheets&spreadsheetId=" + spreadsheet_id
+    )
+    if not isinstance(sheets, list) or not sheets:
+        raise RuntimeError("Spreadsheet AUTOPASTE tidak punya tab apa pun.")
+
+    # Sengaja TIDAK jatuh ke sheets[0] kalau nama yang dikonfigurasi di Panel
+    # sudah tidak ada -- daftar tab produksi ini bercampur antara tab
+    # transaksi (mis. BCA_SARAH) dan tab administratif (mis. REKAPAN
+    # SUNTIKAN, PENDINGAN), jadi memilihkan salah satu secara sembarangan
+    # berisiko menulis transaksi ke tab yang salah tanpa disadari user.
+    configured_sheet = cat.get("sheetName") or ""
+    default = configured_sheet if configured_sheet in sheets else None
+    return sheets, default
+
+
 def send_to_sheet(user_id, name, amount, sheet_name):
     payload = json.dumps(
         {
@@ -136,25 +162,72 @@ class App:
             bg="#1b1b1b", fg="#cccccc",
         ).pack(side="left")
 
-        self.sheet_var = tk.StringVar(value=DEFAULT_SHEET)
+        self.sheet_var = tk.StringVar(value="Memuat...")
         self.sheet_combo = ttk.Combobox(
-            sheet_row, textvariable=self.sheet_var, values=SHEET_OPTIONS,
-            state="readonly", width=14, font=status_font,
+            sheet_row, textvariable=self.sheet_var, values=[],
+            state="disabled", width=14, font=status_font,
         )
         self.sheet_combo.pack(side="left", padx=(8, 0))
 
+        self.refresh_btn = tk.Button(
+            sheet_row, text="↻", font=status_font,
+            bg="#1b1b1b", fg="#f2c14e", relief="flat", bd=0,
+            command=self.load_sheet_options,
+        )
+        self.refresh_btn.pack(side="left", padx=(4, 0))
+
         self.status = tk.Label(
-            root, text="Siap. Copy transaksi lalu klik tombol di atas.",
+            root, text="Memuat daftar sheet...",
             font=status_font, bg="#1b1b1b", fg="#cccccc",
             wraplength=320, justify="left", pady=8,
         )
         self.status.pack(fill="x", padx=16, pady=(0, 14))
 
+        self.load_sheet_options()
+
     def set_status(self, text, color="#cccccc"):
         self.status.configure(text=text, fg=color)
         self.root.update_idletasks()
 
+    def load_sheet_options(self):
+        self.sheet_combo.configure(state="disabled")
+        self.sheet_var.set("Memuat...")
+        self.set_status("Mengambil daftar sheet dari spreadsheet AUTOPASTE...", "#f2c14e")
+        threading.Thread(target=self._load_sheet_options_worker, daemon=True).start()
+
+    def _load_sheet_options_worker(self):
+        try:
+            sheets, default = fetch_sheet_options()
+        except Exception as e:
+            self.root.after(0, lambda: self._on_sheets_loaded(None, None, e))
+            return
+        self.root.after(0, lambda: self._on_sheets_loaded(sheets, default, None))
+
+    def _on_sheets_loaded(self, sheets, default, error):
+        if error is not None:
+            self.sheet_combo.configure(values=[], state="disabled")
+            self.sheet_var.set("(gagal)")
+            self.set_status(f"Gagal ambil daftar sheet: {error}. Klik ↻ untuk coba lagi.", "#e05d5d")
+            return
+        self.sheet_combo.configure(values=sheets, state="readonly")
+        if default:
+            self.sheet_var.set(default)
+            self.set_status("Siap. Copy transaksi lalu klik tombol di atas.", "#cccccc")
+        else:
+            self.sheet_var.set("")
+            self.set_status(
+                "Tab yang diatur di Panel sudah tidak ada -- pilih tab tujuan manual dulu.",
+                "#f2c14e",
+            )
+
     def on_click(self):
+        if str(self.sheet_combo["state"]) != "readonly":
+            self.set_status("Daftar sheet belum siap. Klik ↻ dulu.", "#e05d5d")
+            return
+        if not self.sheet_var.get():
+            self.set_status("Pilih tab tujuan di dropdown dulu sebelum kirim.", "#e05d5d")
+            return
+
         self.btn.configure(state="disabled")
         try:
             try:
