@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'fix-bca-idr-format-16';
+var SCRIPT_VERSION = 'fix-ovo-gopay-name-parse-18';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -267,6 +267,13 @@ function ambilAngka_(rp) {
  * "Pemasukan sebesar IDR 5,000.00 dari **NI SETI****TI di kategori
  * Transfer Rekening" -> "**NI SETI****TI" (nama pengirim, sudah termasuk
  * penyamaran bintang dari BCA sendiri, bukan hasil parsing yang salah).
+ * Juga menangani format notifikasi DANA, mis. "...telah masuk ke akunmu
+ * dari Jhon ter. Yuk, cek detail transaksinya di aplikasi!" -> "Jhon ter"
+ * (ambil sampai titik pertama setelah "dari"), format OVO, mis. "...Kamu
+ * menerima Rp100.000 dari jhon ter. Saldo kamu..." -> "jhon ter" (pola
+ * sama dengan DANA), dan format GoPay, mis. "...Rp75.000 dari jhon ter
+ * sudah masuk." -> "jhon ter" (di sini nama tidak langsung diikuti titik,
+ * jadi perlu pola sendiri yang berhenti di frasa "sudah masuk").
  * Kalau tidak ada pola yang cocok, pakai teks aslinya apa adanya.
  */
 function parseKeterangan_(text) {
@@ -281,6 +288,12 @@ function parseKeterangan_(text) {
 
   var dariKategori = str.match(/\bdari\s+(.+?)\s+di kategori\b/i);
   if (dariKategori) return dariKategori[1].trim();
+
+  var dariSudahMasuk = str.match(/\bdari\s+(.+?)\s+sudah masuk\b/i);
+  if (dariSudahMasuk) return dariSudahMasuk[1].trim();
+
+  var dariTitik = str.match(/\bdari\s+(.+?)\.(?:\s|$)/i);
+  if (dariTitik) return dariTitik[1].trim();
 
   return str;
 }
