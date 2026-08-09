@@ -22,10 +22,13 @@ WEB_APP_URL = (
 CATEGORY = "AUTOPASTE"
 
 # Nama tab persis seperti di Google Sheets (case-sensitive), supaya cocok
-# dengan getSheetByName di backend. TEST 1/TEST 2/Sheet3 sudah di-rename jadi
-# tab per-bank ini (2026-08-09).
-SHEET_OPTIONS = ["BCA", "BRI", "MANDIRI", "BNI", "DANA", "OVO", "LINKAJA", "GOPAY"]
-DEFAULT_SHEET = "BRI"
+# dengan getSheetByName di backend. Sengaja cuma "TEST B" -- kategori
+# AUTOPASTE sekarang menunjuk ke spreadsheet produksi "DEPOSIT IT ( 6-10 )"
+# yang tab aslinya bernama per-teller (BCA_SARAH, BRI_VICTOR, dst, bukan
+# BCA/BRI/dst polos), jadi dropdown lama salah kirim dan bikin tab kosong
+# baru ("BRI") ke-generate otomatis di spreadsheet produksi itu.
+SHEET_OPTIONS = ["TEST B"]
+DEFAULT_SHEET = "TEST B"
 
 # Label channel yang muncul sebagai penanda blok "channel / nama / no HP" di
 # clipboard. Nama pengirim yang diambil adalah baris tepat SETELAH channel
