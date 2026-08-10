@@ -361,6 +361,13 @@ document.getElementById("configForm").addEventListener("submit", function (ev) {
   document.querySelectorAll(".ss-select").forEach(function (sel) {
     var key = sel.getAttribute("data-key");
     var sheetSel = document.querySelector('.sheet-select[data-key="' + key + '"]');
+    // Kirim kategori ini hanya kalau Spreadsheet & Sheet-nya sama-sama
+    // sudah dipilih. Kalau salah satu masih kosong (mis. belum sempat
+    // dipilih, atau daftar sheet belum selesai dimuat), kategori itu
+    // dilewati sama sekali -- bukan dikirim sebagai kosong -- supaya
+    // save_config tidak menimpa konfigurasi kategori lain yang sudah
+    // benar hanya karena satu dropdown di halaman kebetulan belum terisi.
+    if (!sel.value || !sheetSel.value) return;
     configs[key] = { spreadsheetId: sel.value, sheetName: sheetSel.value };
   });
   apiPost({ action: "save_config", configs: configs }).then(function (res) {
