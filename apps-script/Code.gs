@@ -29,7 +29,7 @@
 // Naikkan setiap kali Code.gs diubah -- dipakai untuk memastikan lewat curl
 // (?format=json) bahwa versi yang benar-benar aktif di deployment sudah
 // yang terbaru, bukan versi lama yang ke-cache.
-var SCRIPT_VERSION = 'fix-dana-admin-fee-no-green-bg-19';
+var SCRIPT_VERSION = 'row-checkpoint-speedup-22';
 
 var CATEGORIES = [
   { key: 'BCA', label: 'BCA' },
@@ -287,6 +287,14 @@ function parseKeterangan_(text) {
   var simple = str.match(/KET[.:]+\s*(.+)$/i);
   if (simple) return simple[1].trim();
 
+  // Transfer sesama BRI (BRImo/mobile banking) -- keterangannya berbentuk
+  // "NBMB <nama pengirim>   TO <nama penerima>" (nama penerima biasanya
+  // rekening kita sendiri, tidak relevan dicatat). Nama pengirim sering
+  // dipadding banyak spasi (kolom fixed-width dari sistem BRI), jadi spasi
+  // beruntun dirapikan jadi satu.
+  var nbmbTo = str.match(/\bNBMB\s+(.+?)\s+TO\b/i);
+  if (nbmbTo) return nbmbTo[1].trim().replace(/\s+/g, ' ');
+
   var dariKategori = str.match(/\bdari\s+(.+?)\s+di kategori\b/i);
   if (dariKategori) return dariKategori[1].trim();
 
@@ -340,6 +348,36 @@ function firstEmptyRowFrom_(sheet, startRow) {
     }
   }
   return lastRow + 1;
+}
+
+/**
+ * Baris kosong berikutnya cenderung selalu di dekat baris terakhir yang
+ * barusan ditulis -- transaksi selalu ditambahkan berurutan ke bawah, tidak
+ * pernah menyisip. Tanpa checkpoint ini, firstEmptyRowFrom_ harus scan ULANG
+ * dari baris 4 setiap kali menulis, dan makin lama sheet dipakai (makin
+ * banyak baris terisi + baris formula kosong yang sudah dibuat jauh ke
+ * depan oleh template), makin lambat scan itu (~5-6 detik di sheet ~2900
+ * baris, diukur langsung). Checkpoint per (spreadsheet, sheet) menyimpan
+ * "baris kosong pertama yang diketahui terakhir kali" supaya scan berikutnya
+ * mulai dari situ, bukan dari baris 4 lagi -- kalau checkpoint sudah tidak
+ * kosong lagi (mis. sheet diedit manual), firstEmptyRowFrom_ tetap otomatis
+ * lanjut scan maju dari situ, jadi tetap benar, cuma tidak secepat kalau
+ * checkpoint masih akurat. Satu-satunya kasus yang TIDAK tertangkap: kalau
+ * ada baris kosong yang muncul manual DI ATAS checkpoint (mis. baris
+ * dihapus manual) -- itu akan terlewat sampai checkpoint di-reset. Trade-off
+ * yang diterima demi kecepatan, karena alur normalnya selalu menulis maju.
+ */
+function checkpointKey_(spreadsheetId, sheetName) {
+  return 'ROWCHECK_' + spreadsheetId + '::' + sheetName;
+}
+
+function getRowCheckpoint_(spreadsheetId, sheetName) {
+  var raw = PropertiesService.getScriptProperties().getProperty(checkpointKey_(spreadsheetId, sheetName));
+  return raw ? Number(raw) : 0;
+}
+
+function setRowCheckpoint_(spreadsheetId, sheetName, row) {
+  PropertiesService.getScriptProperties().setProperty(checkpointKey_(spreadsheetId, sheetName), String(row));
 }
 
 /**
@@ -421,7 +459,8 @@ function logTransaction_(body) {
     // yang sudah ada apa adanya -- urutannya otomatis kronologis (transaksi
     // pertama di atas, berikutnya di bawahnya), tanpa perlu menyusun ulang
     // formula sama sekali.
-    var targetRow = wasJustCreated ? 2 : firstEmptyRowFrom_(sheet, firstUsableRowFrom_(sheet, 4));
+    var minRow = Math.max(firstUsableRowFrom_(sheet, 4), getRowCheckpoint_(spreadsheetId, sheetName));
+    var targetRow = wasJustCreated ? 2 : firstEmptyRowFrom_(sheet, minRow);
     var namaRekBank = parseKeterangan_(body.text);
     var nominal = ambilAngka_(body.amount);
 
@@ -442,6 +481,7 @@ function logTransaction_(body) {
       namaRekBank,
       nominal
     ]]);
+    setRowCheckpoint_(spreadsheetId, sheetName, targetRow + 1);
 
     result.status = 'ok';
     result.message = 'Tercatat ke ' + categoryDef.label;
@@ -502,7 +542,8 @@ function logManualEntry_(body) {
     }
 
     var now = new Date();
-    var targetRow = wasJustCreated ? 2 : firstEmptyRowFrom_(sheet, firstUsableRowFrom_(sheet, 4));
+    var minRow = Math.max(firstUsableRowFrom_(sheet, 4), getRowCheckpoint_(spreadsheetId, sheetName));
+    var targetRow = wasJustCreated ? 2 : firstEmptyRowFrom_(sheet, minRow);
     var userId = String(body.userId || '').trim();
     var nama = String(body.name || '').trim();
     var nominal = ambilAngka_(body.amount);
@@ -522,6 +563,7 @@ function logManualEntry_(body) {
       nama,
       nominal
     ]]);
+    setRowCheckpoint_(spreadsheetId, sheetName, targetRow + 1);
 
     result.status = 'ok';
     result.message = 'Tercatat ke ' + categoryDef.label;
@@ -625,6 +667,7 @@ function renderPanel_() {
     '  document.querySelectorAll(".ss-select").forEach(function(sel){' +
     '    var key = sel.getAttribute("data-key");' +
     '    var sheetSel = document.querySelector(".sheet-select[data-key=\\"" + key + "\\"]");' +
+    '    if (!sel.value || !sheetSel.value) return;' +
     '    configs[key] = { spreadsheetId: sel.value, sheetName: sheetSel.value };' +
     '  });' +
     '  postAction({ action: "save_config", configs: configs })' +
